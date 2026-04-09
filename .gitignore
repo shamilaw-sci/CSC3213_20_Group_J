@@ -1,0 +1,21 @@
+# --- Frontend Specific ---
+icrowd-frontend/node_modules/
+icrowd-frontend/dist/
+
+# --- Java Backend Specific (Maven/Gradle) ---
+icrowd-backend/target/
+icrowd-backend/bin/
+icrowd-backend/.settings/
+icrowd-backend/.metadata/
+*.class
+*.jar
+
+# --- System & IDE Junk ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Security (The most important part!) ---
+.env
+.env.local
