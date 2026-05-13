@@ -1,14 +1,17 @@
+import { Link } from 'react-router-dom'
+
 function ProductCard({ product }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow w-full">
-      {/* Product Image */}
-      <img
-        src={product.imageUrl}
-        alt={product.name}
-        className="w-full h-48 object-cover"
-      />
 
-      {/* Product Details */}
+    <Link to={`/product/${product.id}`}>
+      <div className='bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300 cursor-pointer'>
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className='w-full h-64 object-cover'
+        />
+       
+       {/* Product Details */}
       <div className="p-4">
         <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
           {product.category}
@@ -25,8 +28,10 @@ function ProductCard({ product }) {
           Add to Cart
         </button>
       </div>
-    </div>
-  );
-}
+      </div>
+    </Link>
+  )
+};
 
 export default ProductCard;
+
