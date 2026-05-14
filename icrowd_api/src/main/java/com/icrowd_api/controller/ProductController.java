@@ -10,20 +10,29 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin(origins = "*") // Allows your React frontend to talk to this backend without blocking
+@CrossOrigin(origins = "*") 
 @RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
 
-    // React will call: GET http://localhost:8080/api/products
     @GetMapping
     public ResponseEntity<List<Product>> getAllProducts() {
         List<Product> products = productService.getAllProducts();
         return ResponseEntity.ok(products);
     }
 
-    // React will call: GET http://localhost:8080/api/products/category/5
+
+    @GetMapping("/filter")
+    public ResponseEntity<List<Product>> getFilteredProducts(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) String compatibility) {
+        
+        List<Product> products = productService.filterProducts(category, maxPrice, compatibility);
+        return ResponseEntity.ok(products);
+    }
+
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<List<Product>> getProductsByCategory(@PathVariable Long categoryId) {
         List<Product> products = productService.getProductsByCategory(categoryId);

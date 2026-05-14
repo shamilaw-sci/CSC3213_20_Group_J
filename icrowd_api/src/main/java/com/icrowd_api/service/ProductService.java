@@ -4,7 +4,6 @@ import com.icrowd_api.model.Product;
 import com.icrowd_api.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 
 @Service
@@ -13,14 +12,17 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-
-    // 1. Fetch all products in bulk
+    
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
 
-    // 2. Fetch products by Category ID
     public List<Product> getProductsByCategory(Long categoryId) {
         return productRepository.findByCategoryId(categoryId);
+    }
+
+    
+    public List<Product> filterProducts(String category, Double maxPrice, String compatibility) {
+        return productRepository.filterProducts(category, maxPrice, compatibility);
     }
 }
