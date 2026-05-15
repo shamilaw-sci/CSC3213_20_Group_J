@@ -37,7 +37,7 @@ function SearchBar({ onSearch, resultCount }) {
             className="absolute right-4 text-gray-400 hover:text-red-500 transition-colors" 
             onClick={handleClear}
           >
-            ✕
+
           </button>
         )}
       </div>
