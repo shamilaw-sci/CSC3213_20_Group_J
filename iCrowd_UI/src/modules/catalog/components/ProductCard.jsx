@@ -4,7 +4,7 @@ function ProductCard({ product }) {
   return (
 
     <Link to={`/product/${product.id}`}>
-      <div className='bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer border border-gray-100'>
+       <div className='bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300 cursor-pointer'> 
         <img
           src={product.imageUrl}
           alt={product.name}
