@@ -1,15 +1,21 @@
-package com.icrowd_api.model;
+package com.icrowd_api.features.category;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "categories")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Category {
 
     @Id
@@ -17,11 +23,15 @@ public class Category {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name; // e.g., "Smartphones"
+    private String name;
 
     @Column(length = 500)
     private String description;
 
-    @Column(nullable = false, unique = true)
-    private String slug; // e.g., "smartphones" (used for clean URLs in React)
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

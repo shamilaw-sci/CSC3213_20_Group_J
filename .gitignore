@@ -1,12 +1,12 @@
 # --- Frontend Specific ---
-icrowd-frontend/node_modules/
-icrowd-frontend/dist/
+iCrowd_UI/node_modules/
+iCrowd_UI/dist/
 
 # --- Java Backend Specific (Maven/Gradle) ---
-icrowd-backend/target/
-icrowd-backend/bin/
-icrowd-backend/.settings/
-icrowd-backend/.metadata/
+icrowd_api/target/
+icrowd_api/bin/
+icrowd_api/.settings/
+icrowd_api/.metadata/
 *.class
 *.jar
 
