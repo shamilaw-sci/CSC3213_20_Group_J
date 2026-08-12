@@ -1,5 +1,6 @@
 import React from 'react';
 import Navbar from './TopNavigation';
+import AIChatbot from '../../features/assistant/AIChatbot.jsx';
 
 const MainLayout = ({ children }) => {
   return (
@@ -8,6 +9,7 @@ const MainLayout = ({ children }) => {
       <main className="flex-grow">
         {children}
       </main>
+      <AIChatbot />
     </div>
   );
 };
