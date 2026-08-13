@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout.jsx';
-import LandingPage from './features/product/pages/LandingPage.jsx';
-import SearchPage from './features/product/pages/SearchPage.jsx';
-import ProductDetailPage from './features/product/pages/ProductDetailPage.jsx'
+import LandingPage from './features/products/pages/LandingPage.jsx';
+import SearchPage from './features/products/pages/SearchPage.jsx';
+import ProductDetailPage from './features/products/pages/ProductDetailPage.jsx'
 
 function App() {
   return (

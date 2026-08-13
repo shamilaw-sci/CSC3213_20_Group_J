@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchProducts } from '../api/fetchProducts';
 
-/**
- * Custom hook to encapsulate paginated product fetching and state management.
- */
 export const useProducts = (keyword = '', category = '', sort = '', page = 0, size = 10) => {
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({

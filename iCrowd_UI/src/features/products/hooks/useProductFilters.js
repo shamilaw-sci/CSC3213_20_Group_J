@@ -1,9 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 
-/**
- * Custom hook to manage URL search parameters.
- * Keeps UI components "dumb" by abstracting away the React Router logic.
- */
+
 export const useProductFilters = () => {
   const location = useLocation();
   const navigate = useNavigate();

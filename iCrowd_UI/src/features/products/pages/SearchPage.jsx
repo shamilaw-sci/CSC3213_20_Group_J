@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import ProductGrid from '../component/ProductGrid';
-import FilterSidebar from '../component/FilterSidebar';
-import AutoCorrectBanner from '../component/AutoCorrectBanner';
+import ProductGrid from '../components/ProductGrid';
+import FilterSidebar from '../components/FilterSidebar';
+import AutoCorrectBanner from '../components/AutoCorrectBanner';
 import { useProducts } from '../hooks/useProducts';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { fetchSuggestions } from '../api/fetchSuggestions';
@@ -34,7 +34,6 @@ const SearchPage = () => {
           if (bestMatch.toLowerCase() !== keyword.toLowerCase()) {
             setOriginalTypo(keyword);
             setActiveKeyword(bestMatch);
-            // Notice we do NOT change the URL, just the active search keyword
           }
         }
       });
