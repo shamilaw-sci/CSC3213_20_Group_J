@@ -1,5 +1,5 @@
 import React from 'react';
-import Navbar from './TopNavigation';
+import Navbar from './Navbar';
 
 const MainLayout = ({ children }) => {
   return (

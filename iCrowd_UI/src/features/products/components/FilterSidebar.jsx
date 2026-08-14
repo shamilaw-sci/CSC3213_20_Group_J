@@ -4,25 +4,25 @@ const FilterSidebar = ({ currentCategory, currentSort, onCategoryChange, onSortC
   const categories = ['All', 'Headset', 'PowerBank', 'Case'];
   
   return (
-    <div className="bg-surface/50 backdrop-blur-md border border-slate-700/50 p-6 rounded-2xl h-fit sticky top-24">
-      <h3 className="text-xl font-bold text-white mb-6">Filters</h3>
+    <div className="bg-[#F6F6F6] p-6 rounded-[24px] h-fit sticky top-24 border border-transparent">
+      <h3 className="text-xl font-semibold text-black mb-6 tracking-tight">Filters</h3>
       
       {/* Categories */}
       <div className="mb-8">
-        <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
           Category
         </h4>
-        <div className="space-y-2 flex flex-col">
+        <div className="space-y-1 flex flex-col">
           {categories.map((cat) => {
             const isSelected = (currentCategory === cat) || (!currentCategory && cat === 'All');
             return (
               <button
                 key={cat}
                 onClick={() => onCategoryChange(cat)}
-                className={`text-left px-4 py-2 rounded-xl transition-all ${
+                className={`text-left px-4 py-2.5 rounded-xl transition-all font-medium ${
                   isSelected 
-                  ? 'bg-primary/20 text-primary font-medium border border-primary/30' 
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                  ? 'bg-white text-black shadow-sm' 
+                  : 'text-gray-500 hover:bg-gray-200 hover:text-black'
                 }`}
               >
                 {cat}
@@ -34,11 +34,11 @@ const FilterSidebar = ({ currentCategory, currentSort, onCategoryChange, onSortC
 
       {/* Sorting */}
       <div>
-        <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
           Sort By
         </h4>
         <select 
-          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:ring-primary focus:border-primary block p-3 outline-none"
+          className="w-full bg-white text-black text-sm font-medium rounded-xl focus:ring-2 focus:ring-black block p-3 outline-none shadow-sm cursor-pointer appearance-none border-none"
           value={currentSort || ''}
           onChange={(e) => onSortChange(e.target.value)}
         >
