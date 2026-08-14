@@ -27,6 +27,13 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             
+            {/* Admin Placeholder */}
+            <Route path="/admin" element={
+              <div className="min-h-[80vh] flex items-center justify-center">
+                <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
+              </div>
+            } />
+            
           </Routes>
         </MainLayout>
       </Router>
