@@ -4,24 +4,33 @@ import MainLayout from './components/layout/MainLayout.jsx';
 import LandingPage from './features/product/pages/LandingPage.jsx';
 import SearchPage from './features/product/pages/SearchPage.jsx';
 import ProductDetailPage from './features/product/pages/ProductDetailPage.jsx'
+import { AuthProvider } from './features/auth/context/AuthContext.jsx';
+import LoginPage from './features/auth/pages/LoginPage.jsx';
+import RegisterPage from './features/auth/pages/RegisterPage.jsx';
 
 function App() {
   return (
-    <Router>
-      <MainLayout>
-        <Routes>
-          {/* 1. Landing Page */}
-          <Route path="/" element={<LandingPage />} />
-          
-          {/* 2. Search / Category Browse Page */}
-          <Route path="/search" element={<SearchPage />} />
-          
-          {/* 3. Single Product Detail Page */}
-          <Route path="/product/:id" element={<ProductDetailPage />} />
-          
-        </Routes>
-      </MainLayout>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <MainLayout>
+          <Routes>
+            {/* 1. Landing Page */}
+            <Route path="/" element={<LandingPage />} />
+            
+            {/* 2. Search / Category Browse Page */}
+            <Route path="/search" element={<SearchPage />} />
+            
+            {/* 3. Single Product Detail Page */}
+            <Route path="/product/:id" element={<ProductDetailPage />} />
+
+            {/* Auth Pages */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            
+          </Routes>
+        </MainLayout>
+      </Router>
+    </AuthProvider>
   );
 }
 
