@@ -1,10 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SearchBar from '../../features/products/components/SearchBar';
 import { useProductFilters } from '../../features/products/hooks/useProductFilters';
+import { useAuth } from '../../features/auth/hooks/useAuth';
 
 const Navbar = () => {
   const { keyword, setKeyword } = useProductFilters();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const userInitial = user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U';
 
   return (
     <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100 py-3 transition-all">
@@ -29,11 +39,44 @@ const Navbar = () => {
           </div>
 
           {/* User Actions */}
-          <div className="flex items-center gap-6 ml-4">
-            <button className="text-sm font-semibold text-gray-500 hover:text-black transition-colors">
-              Login
-            </button>
-            <button className="bg-black hover:bg-gray-800 text-white px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95 text-sm">
+          <div className="flex items-center gap-4 ml-4">
+            {isAuthenticated ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-sm font-semibold text-gray-800"
+                >
+                  <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                    {userInitial}
+                  </div>
+                  <span className="max-w-[120px] truncate">{user?.firstName || 'Profile'}</span>
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-xs font-semibold text-gray-500 hover:text-red-600 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="text-sm font-semibold text-gray-600 hover:text-black transition-colors px-2 py-1"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-900 px-3.5 py-2 rounded-full transition-colors"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+
+            <button className="bg-black hover:bg-gray-800 text-white px-5 py-2 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95 text-sm">
               Cart (0)
             </button>
           </div>

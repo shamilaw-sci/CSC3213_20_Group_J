@@ -27,6 +27,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll() // Allow auth endpoints
                 .requestMatchers("/api/auth/me").authenticated() // Secure the me endpoint
+                .requestMatchers("/api/users/**").authenticated() // Secure user profile and password endpoints
                 .anyRequest().permitAll() // Allow all other endpoints (like products) for now
             )
             .sessionManagement(session -> session

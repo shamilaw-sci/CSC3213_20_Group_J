@@ -1,5 +1,6 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.auth.security.JwtUtil;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,7 +55,7 @@ public class AuthController {
             
             Map<String, Object> response = new HashMap<>();
             response.put("token", jwt);
-            response.put("user", user.orElse(null));
+            response.put("user", user.map(UserProfileResponse::fromUser).orElse(null));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -72,7 +73,7 @@ public class AuthController {
         Optional<User> user = userService.findByEmail(email);
         
         if (user.isPresent()) {
-            return ResponseEntity.ok(user.get());
+            return ResponseEntity.ok(UserProfileResponse.fromUser(user.get()));
         }
         
         return ResponseEntity.status(404).body(Map.of("message", "User not found"));

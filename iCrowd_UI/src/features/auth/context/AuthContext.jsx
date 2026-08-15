@@ -62,9 +62,19 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const updateUser = (updatedUserData) => {
+        setUser(prev => ({ ...prev, ...updatedUserData }));
+    };
+
+    const isAdmin = user?.role === 'ADMIN';
+    const isAuthenticated = !!user;
+
+    const clearError = () => setError(null);
+
     return (
-        <AuthContext.Provider value={{ user, loading, error, login, register, logout }}>
+        <AuthContext.Provider value={{ user, loading, error, isAdmin, isAuthenticated, login, register, logout, updateUser, clearError }}>
             {children}
         </AuthContext.Provider>
     );
 };
+
