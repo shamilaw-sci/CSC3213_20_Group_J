@@ -1,0 +1,52 @@
+name: Backend Checks
+
+on:
+  pull_request:
+    branches: [ "developer" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    # Set default working directory to the backend folder
+    defaults:
+      run:
+        working-directory: ./icrowd_api
+        
+    # Spin up a temporary PostgreSQL database for the tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Grant execute permission for mvnw
+      run: chmod +x mvnw
+        
+    - name: Build and Test with Maven
+      # Override Spring Boot database properties to point to the temporary Postgres service
+      run: >
+        ./mvnw clean verify
+        -Dspring.datasource.url=jdbc:postgresql://localhost:5432/testdb
+        -Dspring.datasource.username=testuser
+        -Dspring.datasource.password=testpassword
