@@ -7,18 +7,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    // Returns a paginated slice of active products
+    // Customer-facing: only active products
     Page<Product> findByIsActiveTrue(Pageable pageable);
-
-    // Fetch a single active product for the Product Details Page
     Optional<Product> findByIdAndIsActiveTrue(Long id);
 
-    // Advanced dynamic query for Searching and Filtering with Pagination!
+    // Advanced dynamic query for customer search
     @Query("SELECT p FROM Product p WHERE p.isActive = true " +
             "AND (:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
             "AND (:category IS NULL OR :category = '' OR LOWER(p.category.name) = LOWER(:category))")
@@ -28,11 +27,26 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable
     );
 
-    // Fetch all active product names for Fuzzy Keyword Suggestions
-    @Query("SELECT p.name FROM Product p WHERE p.isActive = true")
-    java.util.List<String> findAllActiveProductNames();
-
-    // Fetch all active products for building Rich Search Suggestions
+    // Fetch all active products for fuzzy search suggestions
     @Query("SELECT p FROM Product p WHERE p.isActive = true")
-    java.util.List<Product> findAllActiveProductsList();
+    List<Product> findAllActiveProductsList();
+
+    // Admin: all products (including inactive), paginated
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category")
+    Page<Product> findAllForAdmin(Pageable pageable);
+
+    // Dashboard stats
+    long countByIsActiveTrue();
+    long countByIsActiveFalse();
+
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.isActive = true AND p.availableStock = 0")
+    long countOutOfStock();
+
+    // Low-stock products (stock <= threshold, active only)
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.availableStock <= :threshold ORDER BY p.availableStock ASC")
+    List<Product> findLowStockProducts(@Param("threshold") int threshold);
+
+    // Recent products (admin)
+    @Query("SELECT p FROM Product p ORDER BY p.createdAt DESC")
+    List<Product> findRecentProducts(Pageable pageable);
 }

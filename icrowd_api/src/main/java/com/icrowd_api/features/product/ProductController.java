@@ -1,8 +1,13 @@
 package com.icrowd_api.features.product;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/products")
@@ -15,8 +20,8 @@ public class ProductController {
         this.productService = productService;
     }
 
-    // Advanced search: GET /api/products?keyword=headset&category=Headset&sort=price_asc&page=0&size=10
-    // Notice it returns a Page<Product> instead of List<Product>!
+    // ── Public (Customer-facing) ───────────────────────────────────────────────
+
     @GetMapping
     public ResponseEntity<Page<Product>> getProducts(
             @RequestParam(required = false) String keyword,
@@ -25,12 +30,9 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        // If any parameter is provided, use the advanced search
         if (keyword != null || category != null || sort != null) {
             return ResponseEntity.ok(productService.searchAndFilterProducts(keyword, category, sort, page, size));
         }
-
-        // Otherwise, return all active products paginated
         return ResponseEntity.ok(productService.getAllActiveProducts(page, size));
     }
 
@@ -46,5 +48,78 @@ public class ProductController {
     @GetMapping("/suggestions")
     public ResponseEntity<SuggestionResponse> getSuggestions(@RequestParam String q) {
         return ResponseEntity.ok(productService.getSearchSuggestions(q));
+    }
+
+    // ── Admin CRUD ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<Product>> getAllProductsForAdmin(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(productService.getAllProductsForAdmin(page, size));
+    }
+
+    @GetMapping("/admin/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Long>> getDashboardStats() {
+        return ResponseEntity.ok(productService.getDashboardStats());
+    }
+
+    @GetMapping("/admin/low-stock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Product>> getLowStockProducts(
+            @RequestParam(defaultValue = "5") int threshold) {
+        return ResponseEntity.ok(productService.getLowStockProducts(threshold));
+    }
+
+    @GetMapping("/admin/recent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Product>> getRecentProducts(
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(productService.getRecentProducts(limit));
+    }
+
+    @GetMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Product> getProductByIdForAdmin(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(productService.getProductByIdForAdmin(id));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createProduct(@RequestBody ProductRequest request) {
+        try {
+            Product created = productService.createProduct(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
+        try {
+            Product updated = productService.updateProduct(id, request);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+        try {
+            productService.softDeleteProduct(id);
+            return ResponseEntity.ok(Map.of("message", "Product deactivated successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }
