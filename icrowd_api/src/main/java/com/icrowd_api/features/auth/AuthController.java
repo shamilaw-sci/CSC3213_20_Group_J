@@ -1,6 +1,8 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.auth.security.JwtUtil;
+import com.icrowd_api.features.auth.security.LoginAttemptService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,9 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody User user) {
         String result = userService.registerUser(user);
@@ -42,10 +47,16 @@ public class AuthController {
         String email = loginData.get("email");
         String password = loginData.get("password");
 
+        if (loginAttemptService.isBlocked(email)) {
+            return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
+        }
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, password)
             );
+
+            loginAttemptService.loginSucceeded(email);
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String jwt = jwtUtil.generateToken(userDetails);
@@ -54,10 +65,14 @@ public class AuthController {
             
             Map<String, Object> response = new HashMap<>();
             response.put("token", jwt);
-            response.put("user", user.orElse(null));
+            response.put("user", user.map(UserProfileResponse::fromUser).orElse(null));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            loginAttemptService.loginFailed(email);
+            if (loginAttemptService.isBlocked(email)) {
+                return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
+            }
             return ResponseEntity.status(401).body(Map.of("message", "Invalid email or password!"));
         }
     }
@@ -72,7 +87,7 @@ public class AuthController {
         Optional<User> user = userService.findByEmail(email);
         
         if (user.isPresent()) {
-            return ResponseEntity.ok(user.get());
+            return ResponseEntity.ok(UserProfileResponse.fromUser(user.get()));
         }
         
         return ResponseEntity.status(404).body(Map.of("message", "User not found"));
