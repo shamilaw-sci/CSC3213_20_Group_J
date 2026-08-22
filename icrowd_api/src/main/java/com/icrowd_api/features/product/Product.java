@@ -60,6 +60,21 @@ public class Product {
     @Size(max = 10)
     private List<String> tags;
 
+    private String brand;
+    private String warranty;
+    private String deliveryInfo;
+
+    @ElementCollection
+    @CollectionTable(name = "product_features", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "feature")
+    private List<String> features;
+
+    @ElementCollection
+    @CollectionTable(name = "product_specifications", joinColumns = @JoinColumn(name = "product_id"))
+    @MapKeyColumn(name = "spec_key")
+    @Column(name = "spec_value")
+    private java.util.Map<String, String> specifications;
+
     @Builder.Default
     @Column(nullable = false)
     private Boolean isActive = true;

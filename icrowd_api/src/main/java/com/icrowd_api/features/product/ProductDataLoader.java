@@ -49,8 +49,26 @@ public class ProductDataLoader {
                             .category(category)
                             .price(price)
                             .availableStock(stock)
-                            .imageUrls(List.of(images[categoryIndex], "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80"))
+                            .imageUrls(List.of(
+                                images[categoryIndex], 
+                                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80",
+                                "https://images.unsplash.com/photo-1523206489230-c012c64b2b48?w=500&q=80"
+                            ))
                             .tags(List.of("premium", "new", category.getName().toLowerCase()))
+                            .brand(i % 2 == 0 ? "Sony" : "Anker")
+                            .warranty("1 Year Official Warranty")
+                            .deliveryInfo("Island-wide Delivery within 2-4 working days")
+                            .features(List.of(
+                                "Active Noise Cancellation", 
+                                "30-Hour Battery Life", 
+                                "Water and Sweat Resistant"
+                            ))
+                            .specifications(java.util.Map.of(
+                                "Weight", "250g",
+                                "Dimensions", "15 x 10 x 5 cm",
+                                "Material", "Aluminum / Polycarbonate",
+                                "Bluetooth", "v5.2"
+                            ))
                             .build();
 
                     products.add(p);
