@@ -10,6 +10,7 @@ import ProductFeatures from '../components/ProductFeatures';
 import ProductSpecs from '../components/ProductSpecs';
 import AddToCartButton from '../../../components/ui/AddToCartButton';
 import BuyNowButton from '../../../components/ui/BuyNowButton';
+import ReviewSection from '../../review/components/ReviewSection';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -80,14 +81,14 @@ const ProductDetailPage = () => {
           </h1>
 
           {/* Static Review Stars */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex text-amber-400">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="w-5 h-5 fill-current" />
-              ))}
+          <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center text-amber-500 bg-amber-50 px-3 py-1 rounded-full">
+              <Star className="w-4 h-4 fill-current mr-1" />
+              <span className="font-bold">{product.averageRating?.toFixed(1) || "0.0"}</span>
             </div>
-            <span className="text-black font-bold text-lg">5.0</span>
-            <span className="text-gray-500 font-medium text-sm">(124 reviews)</span>
+            <a href="#reviews" className="text-gray-500 hover:text-black font-medium transition-colors">
+              {product.reviewCount || 0} Reviews
+            </a>
           </div>
           
           <p className="text-gray-700 font-medium leading-relaxed mb-8">
@@ -122,11 +123,8 @@ const ProductDetailPage = () => {
       {/* 2. Technical Specifications */}
       <ProductSpecs specifications={product.specifications} />
 
-      {/* 2. Product Feedback / Reviews (Dummy Component) */}
-      <div className="mb-20 bg-[#F6F6F6] p-8 md:p-12 rounded-[32px]">
-        <h3 className="text-2xl font-bold text-black mb-6">Customer Feedback</h3>
-        <p className="text-gray-500 font-medium italic">No reviews yet. Be the first to review this product!</p>
-      </div>
+      {/* 2. Product Feedback / Reviews */}
+      <ReviewSection productId={product.id} />
 
       {/* 3. Product Grid (Reused for Suggestions!) */}
       <ProductGrid 

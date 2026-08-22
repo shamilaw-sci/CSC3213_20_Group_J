@@ -79,6 +79,10 @@ public class Product {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    private Double averageRating = 0.0;
+
+    private Integer reviewCount = 0;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
