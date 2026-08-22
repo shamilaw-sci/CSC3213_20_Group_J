@@ -3,15 +3,19 @@ import { useParams, Link } from 'react-router-dom';
 import { useProductDetail } from '../hooks/useProductDetail';
 import { useProducts } from '../hooks/useProducts';
 import ProductGrid from '../components/ProductGrid';
+import { Star } from 'lucide-react';
+
+import ProductImageGallery from '../components/ProductImageGallery';
+import ProductFeatures from '../components/ProductFeatures';
+import ProductSpecs from '../components/ProductSpecs';
+import AddToCartButton from '../../../components/ui/AddToCartButton';
+import BuyNowButton from '../../../components/ui/BuyNowButton';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   
-  // 1. Fetch the main product
   const { product, loading, error } = useProductDetail(id);
   
-  // 2. Fetch all products to pick some "suggestions"
-  // In a real app, we might have a specific endpoint for related products!
   const { products: allProducts } = useProducts(); 
   const suggestedProducts = allProducts
     .filter(p => p.id !== Number(id))
@@ -38,40 +42,30 @@ const ProductDetailPage = () => {
     <div className="max-w-7xl mx-auto px-4 py-12">
       
       {/* 1. Product Description Component */}
-      <div className="flex flex-col md:flex-row gap-12 mb-20 bg-[#F6F6F6] p-6 md:p-12 rounded-[32px]">
+      <div className="flex flex-col lg:flex-row gap-12 mb-12 bg-[#F6F6F6] p-6 md:p-12 rounded-[32px]">
         
-        {/* Left: Image */}
+        {/* Left: Image Gallery */}
         <div className="lg:w-1/2">
-          <div className="aspect-square bg-white rounded-[32px] overflow-hidden shadow-sm relative">
-            <img 
-              src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''} 
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-            
-            {/* Gallery thumbnails could go here later if we want to display multiple images */}
-            {product.imageUrls && product.imageUrls.length > 1 && (
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                {product.imageUrls.map((url, i) => (
-                   <div key={i} className="w-12 h-12 rounded-xl bg-white border border-gray-200 overflow-hidden shadow-sm">
-                     <img src={url} className="w-full h-full object-cover" />
-                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductImageGallery images={product.imageUrls} />
         </div>
 
         {/* Right: Details */}
-        <div className="w-full md:w-1/2 flex flex-col justify-center">
-          {/* Category & Tags */}
+        <div className="w-full lg:w-1/2 flex flex-col justify-center">
+          
+          {/* Brand & Tags */}
           <div className="mb-4">
-            <Link to={`/search?category=${encodeURIComponent(product.category?.name || '')}`} className="inline-block text-black font-bold tracking-widest uppercase text-sm mb-2 hover:underline">
-              {product.category?.name || 'Category'}
-            </Link>
+            {product.brand ? (
+              <span className="inline-block text-primary font-bold tracking-widest uppercase text-sm mb-2">
+                {product.brand}
+              </span>
+            ) : (
+              <Link to={`/search?category=${encodeURIComponent(product.category?.name || '')}`} className="inline-block text-black font-bold tracking-widest uppercase text-sm mb-2 hover:underline">
+                {product.category?.name || 'Category'}
+              </Link>
+            )}
             
             {product.tags && product.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 mt-2">
                 {product.tags.map((tag, idx) => (
                   <span key={idx} className="px-3 py-1 bg-white text-xs font-semibold text-gray-500 rounded-full border border-gray-200">
                     #{tag}
@@ -84,30 +78,49 @@ const ProductDetailPage = () => {
           <h1 className="text-4xl md:text-5xl font-black text-black mb-4 tracking-tight">
             {product.name}
           </h1>
+
+          {/* Static Review Stars */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex text-amber-400">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star key={star} className="w-5 h-5 fill-current" />
+              ))}
+            </div>
+            <span className="text-black font-bold text-lg">5.0</span>
+            <span className="text-gray-500 font-medium text-sm">(124 reviews)</span>
+          </div>
           
-          <p className="text-2xl font-bold text-black mb-6">
-            ${product.price.toFixed(2)}
-          </p>
-          
-          <p className="text-gray-700 font-medium leading-relaxed mb-10">
+          <p className="text-gray-700 font-medium leading-relaxed mb-8">
             {product.description}
           </p>
 
-          <div className="flex items-center gap-4 mb-6">
+          <p className="text-4xl font-black text-black mb-8">
+            Rs. {product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          
+          <div className="flex items-center gap-4 mb-8">
             <div className={`w-3 h-3 rounded-full ${product.availableStock > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-gray-700 font-bold">
               {product.availableStock > 0 ? `${product.availableStock} in stock` : 'Out of stock'}
             </span>
           </div>
 
-          <button 
-            disabled={product.availableStock === 0}
-            className="w-full md:w-auto bg-black hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-12 rounded-full transition-all shadow-md hover:shadow-lg active:scale-95 text-lg"
-          >
-            Add to Cart
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 w-full mb-4">
+            <AddToCartButton productId={product.id} className="shadow-sm" />
+            <BuyNowButton productId={product.id} />
+          </div>
+
+          <ProductFeatures 
+            features={product.features}
+            warranty={product.warranty}
+            deliveryInfo={product.deliveryInfo}
+          />
+
         </div>
       </div>
+
+      {/* 2. Technical Specifications */}
+      <ProductSpecs specifications={product.specifications} />
 
       {/* 2. Product Feedback / Reviews (Dummy Component) */}
       <div className="mb-20 bg-[#F6F6F6] p-8 md:p-12 rounded-[32px]">
