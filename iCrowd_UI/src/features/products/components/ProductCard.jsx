@@ -1,8 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useCart } from '../../cart/hooks/CartContext.jsx';
+import { ShoppingBag } from 'lucide-react';
 
 const ProductCard = ({ product }) => {
   const isOutOfStock = product.availableStock === 0;
+  const { addToCart, isProductInCart } = useCart();
+  const inCart = isProductInCart(product.id);
 
   return (
     <div className="group relative bg-[#F6F6F6] rounded-[32px] overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] flex flex-col h-full border border-gray-100">
@@ -54,12 +58,25 @@ const ProductCard = ({ product }) => {
         
         <button 
           disabled={isOutOfStock}
-          className="relative z-20 bg-black hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium py-2.5 px-6 rounded-full transition-all active:scale-95 shadow-md hover:shadow-lg"
+          className={`relative z-20 font-medium py-2.5 px-6 rounded-full transition-all active:scale-95 shadow-md flex items-center justify-center min-w-[90px] ${
+            inCart
+              ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-600/20'
+              : 'bg-black hover:bg-gray-800 text-white hover:shadow-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none'
+          }`}
           onClick={(e) => {
-            console.log(`Added ${product.name} to cart`);
+            e.preventDefault();
+            if (!inCart) {
+              addToCart(product);
+            }
           }}
         >
-          {isOutOfStock ? 'Sold Out' : 'Add'}
+          {isOutOfStock ? (
+            'Sold Out'
+          ) : inCart ? (
+            <ShoppingBag size={20} className="animate-in zoom-in duration-300" />
+          ) : (
+            'Add'
+          )}
         </button>
       </div>
     </div>
@@ -67,3 +84,4 @@ const ProductCard = ({ product }) => {
 };
 
 export default ProductCard;
+

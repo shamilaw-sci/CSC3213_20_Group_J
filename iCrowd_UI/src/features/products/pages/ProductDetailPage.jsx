@@ -107,7 +107,7 @@ const ProductDetailPage = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full mb-4">
-            <AddToCartButton productId={product.id} className="shadow-sm" />
+            <AddToCartButton product={product} className="shadow-sm" />
             <BuyNowButton productId={product.id} />
           </div>
 
