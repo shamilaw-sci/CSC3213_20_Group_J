@@ -1,20 +1,21 @@
 # Cart Management and Purchasing system
 
- - [x] in the cart , customer can be manage product 
+ - [/] in the cart , customer can be manage product 
     - [x] need to be able to increase or decrease quantities,
     - [x] or entirely delete product from the cart
     - [x] if quantity decrease up to 0 product need to be automatically delete from the cart
     - [x] the maximum quantity customer can increased not to be more than item count that stock has
 - [x] when ever the add to cart butter triggers in UI 1 quatity of product need to add to cart other than product stock not available or product is block by the system
 - [x] customer can be go back to catalog and shop through it if they want, and cart details remain , and if customer add new items cart need update with that
-- [x] order summary section:
+- [/] order summary section:
     - [x] total amount is cart need to be calculated and render on screen
-    - [x] if there is promotion on product or customer, total discount like things need to be calculated and reduced amount need to be shown, and final amount need to be shown,
+    - [ ] if there is promotion on product or customer, total discount like things need to be calculated and reduced amount need to be shown, and final amount need to be shown,
     - [x] there is place to customer to add promotions they have using or selecting by them
     - [x] there need to proceed checkout button
-- [x] in product catalog cart buttom UI need to be change to cart logo
-- [x] there need to product suggestion system(product you may like at the bottom of the cart) - we will write the logic for this later. just we need porduct you may like section like the catalog
-- [ ] make cart page with relevan url update in the mainLayout
+- [/] in product catalog cart buttom UI need to be change to cart logo
+- [/] there need to product suggestion system(product you may like at the bottom of the cart) - we will write the logic for this later. just we need porduct you may like section like the catalog
+- [x] make cart page with relevan url update in the mainLayout
+- [x] if customer log out or close the browser accidently while the shopping , when he or she came back to site the card need to remained as same
  
 # Last Item Problem
 
@@ -45,3 +46,30 @@ React receives the 409 Conflict response from the loser of the race. It must now
 - [ ] It disables the ability to buy that specific item and recalculates the cart total minus the sold-out item.
 - [ ] Inform the User: A polite banner is displayed at the top: "Sorry, [Item Name] sold out while you were checking out. Your cart total has been updated.
 - [ ]"Next Action: The user reviews the remaining items and the new total. They can click "Proceed to Checkout" again to successfully buy the rest of their items.
+
+# checkout system
+
+- [x] when customer click proceed checkout button they need to direct first page of checkout
+- [x] there need to be order summary section , shipping address section
+- [/] in the shipping address section customer need to be able to do select shipping address from existing list or need to provide entire new shipping address, (need to be contain fullname, phone number, email, address, district dropdown and delivery type)
+- [x] the shipping will be change according to fast shipping or standard shipping
+- [ ] customer need to be able to mark the shipping location from google maps too
+- [x] use an open source map instead for developement
+- [x] order summary section need to be shown calculated price after adding shipping price too.
+
+- [x] then customer need to redirect to payemnet page in here customer can choose payment type. cash on delivery, card payment, bank transfer
+- [/] Implement an "Order Pending" status for manual Bank Transfer verifications. --- not checked
+- [ ] Integrate a third-party payment gateway drop-in UI instead of a custom card form. --- just custom ui
+- [ ] if it is bank transfer customer need to submit valid receipt --- not checked
+ 
+- [x] then customer can proceed the payment
+- [x] customer will successful or unsuccess msg about the transaction
+- [x] if successful '->   there is buttoN redirect customer to shop again
+- [x]                     and customerr need to get success email with order summary
+- [ ] if unsucessful ->   customer need to be informed gentley about error --- every order become successful not checked because of that
+- [ ]                     he/she need to redirect the place where error occured*(if last item already sold redirect to cart, if card detail wrong redirect to payment)
+
+- [/] use SMTP service for email notification --- just open source softwear not checked because of that 
+- [ ] cloud space to upload images --- not yet
+- [ ] map softwear --- open source softwear 
+- [ ] payment gateway

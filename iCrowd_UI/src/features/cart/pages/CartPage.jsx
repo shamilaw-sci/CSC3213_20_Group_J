@@ -4,7 +4,7 @@ import CartItem from '../components/CartItem.jsx';
 import OrderSummary from '../components/OrderSummary.jsx';
 import ProductGrid from '../../products/components/ProductGrid.jsx';
 import { useProducts } from '../../products/hooks/useProducts.js';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
 
 const CartPage = () => {
@@ -14,10 +14,10 @@ const CartPage = () => {
   // Just grab some random products for "You may like"
   const suggestedProducts = products.slice(0, 4);
 
+  const navigate = useNavigate();
+
   const handleCheckout = () => {
-    // This is a stub for now. Backend logic will follow in the next phase.
-    alert("Proceeding to checkout... (Backend integration pending)");
-    console.log("Checkout initiated with cart:", cart);
+    navigate('/checkout/shipping');
   };
 
   if (cart.length === 0) {
