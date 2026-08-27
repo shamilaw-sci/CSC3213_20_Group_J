@@ -3,10 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import SearchBar from '../../features/products/components/SearchBar';
 import { useProductFilters } from '../../features/products/hooks/useProductFilters';
 import { useAuth } from '../../features/auth/hooks/useAuth';
+import { useCart } from '../../features/cart/hooks/CartContext';
+import { ShoppingBag } from 'lucide-react';
 
 const Navbar = () => {
   const { keyword, setKeyword } = useProductFilters();
   const { user, isAuthenticated, logout } = useAuth();
+  const { getItemCount } = useCart();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -76,10 +79,20 @@ const Navbar = () => {
               </div>
             )}
 
-            <button className="bg-black hover:bg-gray-800 text-white px-5 py-2 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95 text-sm">
-              Cart (0)
-            </button>
+            <Link 
+              to="/cart"
+              className="bg-black hover:bg-gray-800 text-white px-5 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+              aria-label="View Cart"
+            >
+              <ShoppingBag size={18} />
+              {getItemCount() > 0 && (
+                <span className="bg-white text-black text-xs font-bold px-2 py-0.5 rounded-full -ml-1">
+                  {getItemCount()}
+                </span>
+              )}
+            </Link>
           </div>
+
         </div>
       </div>
     </nav>

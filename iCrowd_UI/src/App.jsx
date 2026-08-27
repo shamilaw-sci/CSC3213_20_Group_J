@@ -5,15 +5,18 @@ import LandingPage from './features/products/pages/LandingPage.jsx';
 import SearchPage from './features/products/pages/SearchPage.jsx';
 import ProductDetailPage from './features/products/pages/ProductDetailPage.jsx'
 import { AuthProvider } from './features/auth/context/AuthContext.jsx';
+import { CartProvider } from './features/cart/hooks/CartContext.jsx';
 import LoginPage from './features/auth/pages/LoginPage.jsx';
 import RegisterPage from './features/auth/pages/RegisterPage.jsx';
 import ProfilePage from './features/user/pages/ProfilePage.jsx';
 import ProtectedRoute from './features/auth/component/ProtectedRoute.jsx';
+import CartPage from './features/cart/pages/CartPage.jsx';
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <CartProvider>
+        <Router>
         <MainLayout>
           <Routes>
             {/* 1. Landing Page */}
@@ -46,10 +49,13 @@ function App() {
               </div>
             } />
 
+            {/* Cart Page */}
+            <Route path="/cart" element={<CartPage />} />
 
           </Routes>
         </MainLayout>
-      </Router>
+        </Router>
+      </CartProvider>
     </AuthProvider>
   );
 }
