@@ -1,7 +1,7 @@
 import React from 'react';
 
 const FilterSidebar = ({ currentCategory, currentSort, onCategoryChange, onSortChange }) => {
-  const categories = ['All', 'Headset', 'PowerBank', 'Case'];
+  const categories = ['All', 'Smartphone', 'Headset', 'PowerBank', 'Case'];
   
   return (
     <div className="bg-[#F6F6F6] p-6 rounded-[24px] h-fit sticky top-24 border border-transparent">

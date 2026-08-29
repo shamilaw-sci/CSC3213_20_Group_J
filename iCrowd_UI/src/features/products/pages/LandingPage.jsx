@@ -20,7 +20,7 @@ const LandingPage = () => {
           Pro, Beyond.
         </h1>
         <p className="text-xl md:text-2xl font-medium tracking-tight text-gray-400 max-w-2xl mx-auto mb-10 relative z-10">
-          Premium mobile accessories curated for the modern lifestyle.
+          Flagship smartphones and premium gear curated for the modern digital lifestyle.
         </p>
         <Link to="/search" className="inline-block bg-white hover:scale-105 text-black font-semibold py-4 px-12 rounded-full transition-all text-lg shadow-xl relative z-10 active:scale-95">
           Shop Now
@@ -33,7 +33,7 @@ const LandingPage = () => {
           Browse by Category
         </h3>
         <div className="flex flex-wrap justify-center gap-4">
-          {['Headset', 'PowerBank', 'Case'].map(cat => (
+          {['Smartphone', 'Headset', 'PowerBank', 'Case'].map(cat => (
             <Link 
               key={cat} 
               to={`/search?category=${cat}`}
@@ -45,14 +45,14 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* Featured Products using our highly reusable ProductGrid! */}
+      {/* Featured Products */}
       <div className="max-w-7xl mx-auto px-4 pb-20">
         <ProductGrid 
-          products={products.slice(0, 4)} // Just show top 4 featured
+          products={products.slice(0, 6)}
           loading={loading}
           error={error}
-          title="Featured Accessories"
-          subtitle="Hand-picked essentials for your devices."
+          title="Featured Devices & Gear"
+          subtitle="Hand-picked smartphones and essentials for your setup."
         />
       </div>
     </div>
