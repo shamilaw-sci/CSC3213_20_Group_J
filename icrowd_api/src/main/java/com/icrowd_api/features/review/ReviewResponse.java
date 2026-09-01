@@ -12,13 +12,19 @@ public class ReviewResponse {
     private Integer rating;
     private String title;
     private String comment;
-    private String authorName; // Extracted from User.firstName + User.lastName
+    private String authorName; // Extracted from Customer/Admin or email
     private LocalDateTime createdAt;
 
     public static ReviewResponse fromEntity(Review review) {
         String author = "Anonymous";
         if (review.getUser() != null) {
-            author = review.getUser().getFirstName() + " " + review.getUser().getLastName();
+            if (review.getUser().getCustomer() != null) {
+                author = review.getUser().getCustomer().getFirstName() + " " + review.getUser().getCustomer().getLastName();
+            } else if (review.getUser().getAdmin() != null) {
+                author = review.getUser().getAdmin().getFirstName() + " " + review.getUser().getAdmin().getLastName();
+            } else if (review.getUser().getEmail() != null) {
+                author = review.getUser().getEmail().split("@")[0];
+            }
         }
 
         return ReviewResponse.builder()

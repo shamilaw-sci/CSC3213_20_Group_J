@@ -4,7 +4,7 @@ import { useAuth } from './useAuth';
 
 /**
  * Custom hook containing all business logic and state for Customer Registration.
- * Customer registration is strictly restricted to role: 'USER'.
+ * Customer registration is strictly restricted to role: 'CUSTOMER'.
  */
 export const useRegisterForm = () => {
     const initialFormState = {
@@ -16,7 +16,7 @@ export const useRegisterForm = () => {
         address: '',
         district: '',
         city: '',
-        role: 'USER' // Strictly Customer
+        role: 'CUSTOMER' // Strictly Customer
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -48,7 +48,7 @@ export const useRegisterForm = () => {
         try {
             await register({
                 ...formData,
-                role: 'USER' // Enforce Customer role
+                role: 'CUSTOMER' // Enforce Customer role
             });
             setSuccessMessage('Registration successful! Redirecting to login...');
             setTimeout(() => {

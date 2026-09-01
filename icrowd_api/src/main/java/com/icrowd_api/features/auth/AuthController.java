@@ -1,5 +1,6 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.auth.dto.RegisterRequest;
 import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.auth.security.JwtUtil;
 import com.icrowd_api.features.auth.security.LoginAttemptService;
@@ -34,8 +35,8 @@ public class AuthController {
     private LoginAttemptService loginAttemptService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody User user) {
-        String result = userService.registerUser(user);
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+        String result = userService.registerUser(registerRequest);
         if (result.contains("successfully")) {
             return ResponseEntity.ok().body(Map.of("message", result));
         }
@@ -61,11 +62,11 @@ public class AuthController {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String jwt = jwtUtil.generateToken(userDetails);
 
-            Optional<User> user = userService.findByEmail(email);
-            
+            Optional<UserProfileResponse> userProfile = userService.getUserProfile(email);
+
             Map<String, Object> response = new HashMap<>();
             response.put("token", jwt);
-            response.put("user", user.map(UserProfileResponse::fromUser).orElse(null));
+            response.put("user", userProfile.orElse(null));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -82,14 +83,14 @@ public class AuthController {
         if (authentication == null) {
             return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
         }
-        
+
         String email = authentication.getName();
-        Optional<User> user = userService.findByEmail(email);
-        
-        if (user.isPresent()) {
-            return ResponseEntity.ok(UserProfileResponse.fromUser(user.get()));
+        Optional<UserProfileResponse> profile = userService.getUserProfile(email);
+
+        if (profile.isPresent()) {
+            return ResponseEntity.ok(profile.get());
         }
-        
+
         return ResponseEntity.status(404).body(Map.of("message", "User not found"));
     }
 }
