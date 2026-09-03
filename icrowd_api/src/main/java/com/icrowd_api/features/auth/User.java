@@ -4,45 +4,53 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "First name is required")
-    private String firstName;
-
-    @NotBlank(message = "Last name is required")
-    private String lastName;
-
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String email;
 
     @NotBlank(message = "Password is required")
+    @Column(nullable = false)
     private String password;
 
-    @NotBlank(message = "Phone number is required")
-    private String phone;
+    @Builder.Default
+    @Column(nullable = false)
+    private String role = "CUSTOMER"; // CUSTOMER, ADMIN
 
-    @NotBlank(message = "Address is required")
-    private String address;
+    @Builder.Default
+    @Column(nullable = false)
+    private String accountStatus = "ACTIVE"; // ACTIVE, LOCKED, SUSPENDED
 
-    @NotBlank(message = "District is required")
-    private String district;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Customer customer;
 
-    @NotBlank(message = "City is required")
-    private String city;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Admin admin;
 
-    private String role = "USER";
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

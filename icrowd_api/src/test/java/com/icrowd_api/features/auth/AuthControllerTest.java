@@ -110,7 +110,7 @@ public class AuthControllerTest {
         Mockito.when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         Mockito.when(jwtUtil.generateToken(userDetails)).thenReturn("mock-jwt-token");
-        Mockito.when(userService.findByEmail(email)).thenReturn(Optional.of(new User()));
+        Mockito.when(userService.getUserProfile(email)).thenReturn(Optional.of(new com.icrowd_api.features.auth.dto.UserProfileResponse()));
 
         ResponseEntity<?> response = authController.loginUser(loginData);
         assertEquals(200, response.getStatusCode().value());

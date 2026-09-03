@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+    fetchUserAddresses,
+    createUserAddress,
+    updateUserAddress,
+    deleteUserAddress,
+    setDefaultUserAddress
+} from '../api/userApi';
 
 /**
  * Custom Hook: useAddressBook
- * Manages customer delivery addresses with multiple address support,
- * set default, add, edit, and delete operations.
+ * Manages customer delivery addresses with backend integration,
+ * multiple address support, set default, add, edit, and delete operations.
  */
 export const useAddressBook = (user) => {
     const storageKey = user ? `user_addresses_${user.id || user.email}` : 'user_addresses_default';
@@ -18,7 +25,6 @@ export const useAddressBook = (user) => {
             console.error("Failed to load saved addresses", e);
         }
 
-        // Default initial addresses based on user's profile if available
         if (user && (user.address || user.city)) {
             return [
                 {
@@ -38,37 +44,32 @@ export const useAddressBook = (user) => {
             ];
         }
 
-        return [
-            {
-                id: 'addr-1',
-                label: 'Home',
-                recipientName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'John Silva',
-                phone: user?.phone || '+94 77 123 4567',
-                address: user?.address || '123 Main Street',
-                city: user?.city || 'Colombo 03',
-                district: user?.district || 'Colombo',
-                province: 'Western Province',
-                postalCode: '00300',
-                latitude: 6.9271,
-                longitude: 79.8612,
-                isDefault: true
-            },
-            {
-                id: 'addr-2',
-                label: 'Work',
-                recipientName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'John Silva',
-                phone: user?.phone || '+94 71 987 6543',
-                address: '45 Office Road, Level 4',
-                city: 'Colombo 02',
-                district: 'Colombo',
-                province: 'Western Province',
-                postalCode: '00200',
-                latitude: 6.9218,
-                longitude: 79.8562,
-                isDefault: false
-            }
-        ];
+        return [];
     });
+
+    const [loading, setLoading] = useState(false);
+
+    const loadAddresses = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        setLoading(true);
+        try {
+            const backendAddresses = await fetchUserAddresses();
+            if (Array.isArray(backendAddresses)) {
+                setAddresses(backendAddresses);
+                localStorage.setItem(storageKey, JSON.stringify(backendAddresses));
+            }
+        } catch (err) {
+            console.warn("Could not fetch addresses from backend, using local state:", err?.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [storageKey]);
+
+    useEffect(() => {
+        loadAddresses();
+    }, [loadAddresses]);
 
     // Save to localStorage whenever addresses change
     useEffect(() => {
@@ -81,11 +82,12 @@ export const useAddressBook = (user) => {
         }
     }, [addresses, storageKey]);
 
-    const addAddress = (newAddr) => {
-        const id = 'addr_' + Date.now();
+    const addAddress = async (newAddr) => {
+        // Optimistic UI update
+        const tempId = 'temp_' + Date.now();
         const addressToAdd = {
             ...newAddr,
-            id,
+            id: tempId,
             isDefault: addresses.length === 0 || newAddr.isDefault
         };
 
@@ -98,12 +100,23 @@ export const useAddressBook = (user) => {
             }
             return [...prev, addressToAdd];
         });
+
+        try {
+            const res = await createUserAddress(newAddr);
+            const saved = res.address || res;
+            if (saved && saved.id) {
+                setAddresses(prev => prev.map(a => a.id === tempId ? saved : a));
+                return saved;
+            }
+        } catch (err) {
+            console.warn("Backend add address failed, kept in local state:", err?.message);
+        }
         return addressToAdd;
     };
 
-    const updateAddress = (id, updatedData) => {
+    const updateAddress = async (id, updatedData) => {
         setAddresses(prev => {
-            let nextList = prev.map(a => {
+            return prev.map(a => {
                 if (a.id === id) {
                     return { ...a, ...updatedData };
                 }
@@ -112,28 +125,55 @@ export const useAddressBook = (user) => {
                 }
                 return a;
             });
-            return nextList;
         });
+
+        // Only call backend if id is a valid backend ID (numeric or long)
+        if (id && !String(id).startsWith('temp_') && !String(id).startsWith('addr-')) {
+            try {
+                const res = await updateUserAddress(id, updatedData);
+                const updated = res.address || res;
+                if (updated) {
+                    setAddresses(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+                }
+            } catch (err) {
+                console.warn("Backend update address failed:", err?.message);
+            }
+        }
     };
 
-    const deleteAddress = (id) => {
+    const deleteAddress = async (id) => {
         setAddresses(prev => {
             const filtered = prev.filter(a => a.id !== id);
-            // If the deleted address was default, set the first one as default
             if (filtered.length > 0 && !filtered.some(a => a.isDefault)) {
                 filtered[0].isDefault = true;
             }
             return filtered;
         });
+
+        if (id && !String(id).startsWith('temp_') && !String(id).startsWith('addr-')) {
+            try {
+                await deleteUserAddress(id);
+            } catch (err) {
+                console.warn("Backend delete address failed:", err?.message);
+            }
+        }
     };
 
-    const setDefaultAddress = (id) => {
+    const setDefaultAddress = async (id) => {
         setAddresses(prev =>
             prev.map(a => ({
                 ...a,
                 isDefault: a.id === id
             }))
         );
+
+        if (id && !String(id).startsWith('temp_') && !String(id).startsWith('addr-')) {
+            try {
+                await setDefaultUserAddress(id);
+            } catch (err) {
+                console.warn("Backend set default address failed:", err?.message);
+            }
+        }
     };
 
     const defaultAddress = addresses.find(a => a.isDefault) || addresses[0] || null;
@@ -141,10 +181,12 @@ export const useAddressBook = (user) => {
     return {
         addresses,
         defaultAddress,
+        loading,
         addAddress,
         updateAddress,
         deleteAddress,
-        setDefaultAddress
+        setDefaultAddress,
+        refreshAddresses: loadAddresses
     };
 };
 
