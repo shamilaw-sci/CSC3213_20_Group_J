@@ -1,82 +1,66 @@
-import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigate, Link } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useLoginForm } from '../hooks/useLoginForm';
+import AuthInput from './AuthInput';
+import AuthButton from './AuthButton';
+import AuthAlert from './AuthAlert';
 
+/**
+ * Presentational & Container Component: LoginForm
+ * Connects useLoginForm hook with reusable UI dumb components.
+ */
 const LoginForm = () => {
-    const [credentials, setCredentials] = useState({ email: '', password: '' });
-    const { login, loading, error } = useAuth();
-    const navigate = useNavigate();
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setCredentials(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const user = await login(credentials);
-            if (user?.role === 'ADMIN') {
-                navigate('/admin');
-            } else {
-                navigate('/');
-            }
-        } catch (err) {
-            // Error is handled in context and displayed via 'error' state
-        }
-    };
+    const { credentials, loading, error, handleChange, handleSubmit } = useLoginForm();
 
     return (
-        <div className="w-full max-w-md mx-auto bg-white border border-gray-300 p-8 rounded-2xl shadow-xl">
-            <h2 className="text-3xl font-black text-gray-900 mb-6 text-center tracking-tight">Welcome Back</h2>
+        <div className="w-full max-w-md mx-auto bg-white border border-gray-200 p-8 md:p-10 rounded-2xl shadow-xl">
+            <div className="text-center mb-8">
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Welcome Back</h2>
+                <p className="text-gray-500 text-sm mt-1">Sign in to manage your account and orders</p>
+            </div>
 
-            {error && (
-                <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl mb-6 text-sm">
-                    {error}
-                </div>
-            )}
+            <AuthAlert type="error" message={error} />
 
             <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">Email</label>
-                    <input
-                        id="email"
-                        type="email"
-                        name="email"
-                        required
-                        value={credentials.email}
-                        onChange={handleChange}
-                        className="w-full bg-surface border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">Password</label>
-                    <input
-                        id="password"
-                        type="password"
-                        name="password"
-                        required
-                        value={credentials.password}
-                        onChange={handleChange}
-                        className="w-full bg-surface border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    />
-                </div>
+                <AuthInput
+                    id="email"
+                    name="email"
+                    type="email"
+                    label="Email Address"
+                    placeholder="name@example.com"
+                    required
+                    value={credentials.email}
+                    onChange={handleChange}
+                />
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40 text-lg mt-4"
-                >
-                    {loading ? 'Signing in...' : 'Sign In'}
-                </button>
+                <AuthInput
+                    id="password"
+                    name="password"
+                    type="password"
+                    label="Password"
+                    placeholder="Enter your password"
+                    required
+                    value={credentials.password}
+                    onChange={handleChange}
+                />
+
+                <div className="pt-2">
+                    <AuthButton
+                        type="submit"
+                        loading={loading}
+                        loadingText="Signing In..."
+                    >
+                        Sign In
+                    </AuthButton>
+                </div>
             </form>
 
-            <p className="mt-6 text-center text-gray-600 text-sm">
+            <div className="mt-8 pt-6 border-t border-gray-100 text-center text-gray-600 text-sm">
                 Don't have an account?{' '}
-                <Link to="/register" className="text-primary hover:text-black transition-colors font-medium">
-                    Register here
+                <Link to="/register" className="text-primary hover:text-black transition-colors font-semibold">
+                    Create Customer Account
                 </Link>
-            </p>
+            </div>
         </div>
     );
 };

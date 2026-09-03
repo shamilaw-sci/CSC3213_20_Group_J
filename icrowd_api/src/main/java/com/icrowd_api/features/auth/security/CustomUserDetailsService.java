@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -23,8 +24,17 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        String role = (user.getRole() != null) ? user.getRole() : "USER";
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        // Normalise role — developer branch uses CUSTOMER, HEAD used USER; support both
+        String rawRole = user.getRole() != null ? user.getRole().toUpperCase() : "CUSTOMER";
+
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + rawRole));
+
+        // Alias CUSTOMER and USER so both hasRole('CUSTOMER') and hasRole('USER') work
+        if ("CUSTOMER".equals(rawRole) || "USER".equals(rawRole)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+        }
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),

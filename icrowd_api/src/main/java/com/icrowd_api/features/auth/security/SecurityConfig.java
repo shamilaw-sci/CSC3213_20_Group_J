@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
+                // Public review reads
+                .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 // Admin-only write operations on products
                 .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
@@ -51,8 +53,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
                 // All /api/admin/** require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // Auth/me requires authentication
+                // Auth/me and create-admin require authentication
                 .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
+                // User profile and address endpoints require authentication
+                .requestMatchers("/api/users/**").authenticated()
+                // Cart and order endpoints require authentication
+                .requestMatchers("/api/cart/**", "/api/orders/**").authenticated()
                 // Everything else requires authentication
                 .anyRequest().authenticated()
             )
@@ -68,7 +74,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        // HEAD: localhost:5173 | developer: adds 127.0.0.1:5173 and localhost:3000
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
