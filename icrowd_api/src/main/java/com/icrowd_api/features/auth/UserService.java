@@ -109,6 +109,49 @@ public class UserService {
         return userRepository.findByEmail(email).map(UserProfileResponse::fromUser);
     }
 
+    @Transactional(readOnly = true)
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<User> findById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    @Transactional
+    public String promoteToAdmin(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return "User not found with email: " + email;
+        }
+        User user = userOpt.get();
+        user.setRole("ADMIN");
+        userRepository.save(user);
+        return "User promoted to ADMIN successfully!";
+    }
+
+    @Transactional
+    public String demoteToUser(Long id) {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return "User not found";
+        }
+        User user = userOpt.get();
+        user.setRole("CUSTOMER");
+        userRepository.save(user);
+        return "User demoted to CUSTOMER successfully!";
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        userRepository.deleteById(id);
+    }
+
+    public boolean existsByRole(String role) {
+        return userRepository.existsByRole(role);
+    }
+
     @Transactional
     public UserProfileResponse updateUserProfile(String email, UpdateProfileRequest request) {
         User user = userRepository.findByEmail(email)
@@ -126,7 +169,6 @@ public class UserService {
                 customer.setProfileImage(request.getProfileImage());
             }
 
-            // If address info is passed and customer has an address, update default address
             if (request.getAddress() != null && !request.getAddress().trim().isEmpty()) {
                 if (customer.getAddresses() != null && !customer.getAddresses().isEmpty()) {
                     Address defaultAddr = customer.getAddresses().stream()
@@ -268,10 +310,10 @@ public class UserService {
 
         if (addressDto.getRecipientName() != null) address.setRecipientName(addressDto.getRecipientName());
         if (addressDto.getPhone() != null) address.setPhone(addressDto.getPhone());
-        
+
         String line1 = addressDto.getAddressLine1() != null ? addressDto.getAddressLine1() : addressDto.getAddress();
         if (line1 != null) address.setAddressLine1(line1.trim());
-        
+
         if (addressDto.getAddressLine2() != null) address.setAddressLine2(addressDto.getAddressLine2());
         if (addressDto.getCity() != null) address.setCity(addressDto.getCity().trim());
         if (addressDto.getDistrict() != null) address.setDistrict(addressDto.getDistrict());

@@ -7,6 +7,7 @@ import com.icrowd_api.features.auth.security.LoginAttemptService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -19,7 +20,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 public class AuthController {
 
     @Autowired
@@ -60,8 +61,11 @@ public class AuthController {
             loginAttemptService.loginSucceeded(email);
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String jwt = jwtUtil.generateToken(userDetails);
+            Optional<User> userOpt = userService.findByEmail(email);
+            String role = userOpt.map(User::getRole).orElse("CUSTOMER");
+            String jwt = jwtUtil.generateToken(userDetails, role);
 
+            // Return richer UserProfileResponse so frontend gets firstName, lastName, etc.
             Optional<UserProfileResponse> userProfile = userService.getUserProfile(email);
 
             Map<String, Object> response = new HashMap<>();
@@ -92,5 +96,17 @@ public class AuthController {
         }
 
         return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+    }
+
+    // ADMIN only: promote a user to ADMIN role
+    @PostMapping("/create-admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createAdmin(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String result = userService.promoteToAdmin(email);
+        if (result.contains("successfully")) {
+            return ResponseEntity.ok(Map.of("message", result));
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", result));
     }
 }

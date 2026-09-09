@@ -15,12 +15,9 @@ import java.util.function.Function;
 
 @Component
 public class JwtUtil {
-    
-    // Generates a secure key for HS256
+
     private final SecretKey secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-    
-    // 24 hours expiry
-    private final long JWT_TOKEN_VALIDITY = 24 * 60 * 60 * 1000;
+    private final long JWT_TOKEN_VALIDITY = 24 * 60 * 60 * 1000; // 24 hours
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -28,6 +25,10 @@ public class JwtUtil {
 
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
+    }
+
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -43,15 +44,25 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
+    // Legacy overload for compatibility
     public String generateToken(UserDetails userDetails) {
+        return generateToken(userDetails, "USER");
+    }
+
+    public String generateToken(UserDetails userDetails, String role) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role);
         return createToken(claims, userDetails.getUsername());
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
-        return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
-                .signWith(secretKey).compact();
+                .signWith(secretKey)
+                .compact();
     }
 
     public Boolean validateToken(String token, UserDetails userDetails) {

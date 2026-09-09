@@ -1,23 +1,36 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout.jsx';
+import AdminLayout from './components/layout/AdminLayout.jsx';
 import LandingPage from './features/products/pages/LandingPage.jsx';
 import SearchPage from './features/products/pages/SearchPage.jsx';
-import ProductDetailPage from './features/products/pages/ProductDetailPage.jsx'
+import ProductDetailPage from './features/products/pages/ProductDetailPage.jsx';
 import { AuthProvider } from './features/auth/context/AuthContext.jsx';
 import { CartProvider } from './features/cart/hooks/CartContext.jsx';
 import LoginPage from './features/auth/pages/LoginPage.jsx';
 import RegisterPage from './features/auth/pages/RegisterPage.jsx';
+import AdminRoute from './features/admin/components/AdminRoute.jsx';
+import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
+import AdminProducts from './features/admin/pages/AdminProducts.jsx';
+import AdminCategories from './features/admin/pages/AdminCategories.jsx';
+import AdminUsers from './features/admin/pages/AdminUsers.jsx';
 import ProfilePage from './features/user/pages/ProfilePage.jsx';
 import ProtectedRoute from './features/auth/component/ProtectedRoute.jsx';
 import CartPage from './features/cart/pages/CartPage.jsx';
 
-// Checkout 
+// Checkout
 import CheckoutLayout from './features/checkout/components/CheckoutLayout.jsx';
 import ShippingPage from './features/checkout/pages/ShippingPage.jsx';
 import PaymentPage from './features/checkout/pages/PaymentPage.jsx';
 import CheckoutSuccessPage from './features/checkout/pages/CheckoutSuccessPage.jsx';
 import CheckoutErrorPage from './features/checkout/pages/CheckoutErrorPage.jsx';
+
+// Wraps all customer-facing routes in the shared Navbar layout
+const CustomerShell = () => (
+  <MainLayout>
+    <Outlet />
+  </MainLayout>
+);
 
 function App() {
   return (
@@ -25,36 +38,24 @@ function App() {
       <CartProvider>
         <Router>
           <Routes>
-            {/* 
-              Standard Routes (With MainLayout Navbar/Footer)
-            */}
-            <Route path="/" element={<MainLayout><LandingPage /></MainLayout>} />
-            <Route path="/search" element={<MainLayout><SearchPage /></MainLayout>} />
-            <Route path="/product/:id" element={<MainLayout><ProductDetailPage /></MainLayout>} />
-            <Route path="/cart" element={<MainLayout><CartPage /></MainLayout>} />
-            
-            {/* Auth Pages */}
-            <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
-            <Route path="/register" element={<MainLayout><RegisterPage /></MainLayout>} />
+            {/* ── Customer-facing routes (Navbar + Footer) ─────────────────── */}
+            <Route element={<CustomerShell />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/product/:id" element={<ProductDetailPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/cart" element={<CartPage />} />
 
-            {/* Protected User Routes */}
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <MainLayout><ProfilePage /></MainLayout>
-              </ProtectedRoute>
-            } />
+              {/* Protected User Routes */}
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } />
+            </Route>
 
-            <Route path="/admin" element={
-              <MainLayout>
-                <div className="min-h-[80vh] flex items-center justify-center">
-                  <h1 className="text-4xl font-bold text-black">Admin Dashboard</h1>
-                </div>
-              </MainLayout>
-            } />
-
-            {/* 
-              Checkout Routes (With CheckoutLayout)
-            */}
+            {/* ── Checkout Routes (CheckoutLayout) ──────────────────────────── */}
             <Route path="/checkout/shipping" element={
               <ProtectedRoute>
                 <CheckoutLayout><ShippingPage /></CheckoutLayout>
@@ -76,6 +77,20 @@ function App() {
               </ProtectedRoute>
             } />
 
+            {/* ── Admin routes (sidebar layout, no Navbar) ──────────────────── */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminLayout />
+                </AdminRoute>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<AdminProducts />} />
+              <Route path="categories" element={<AdminCategories />} />
+              <Route path="users" element={<AdminUsers />} />
+            </Route>
           </Routes>
         </Router>
       </CartProvider>
