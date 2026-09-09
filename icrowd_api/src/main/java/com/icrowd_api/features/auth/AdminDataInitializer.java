@@ -18,17 +18,27 @@ public class AdminDataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         // Create default admin account if none exists
         if (!userRepository.existsByRole("ADMIN")) {
-            User admin = new User();
-            admin.setFirstName("Admin");
-            admin.setLastName("iCrowd");
-            admin.setEmail("admin@icrowd.com");
-            admin.setPassword(passwordEncoder.encode("Admin@1234"));
-            admin.setPhone("0000000000");
-            admin.setAddress("Admin HQ");
-            admin.setDistrict("Admin District");
-            admin.setCity("Colombo");
-            admin.setRole("ADMIN");
-            userRepository.save(admin);
+
+            // 1. Build the Admin profile (firstName, lastName, phone live here now)
+            Admin adminProfile = Admin.builder()
+                    .firstName("Admin")
+                    .lastName("iCrowd")
+                    .phone("0000000000")
+                    .build();
+
+            // 2. Build the User (email, password, role) and attach the Admin profile
+            User user = User.builder()
+                    .email("admin@icrowd.com")
+                    .password(passwordEncoder.encode("Admin@1234"))
+                    .role("ADMIN")
+                    .accountStatus("ACTIVE")
+                    .admin(adminProfile)
+                    .build();
+
+            // 3. Wire back-reference (Admin → User) so the FK is set correctly
+            adminProfile.setUser(user);
+
+            userRepository.save(user); // CascadeType.ALL saves Admin automatically
             System.out.println("✅ Default admin created: admin@icrowd.com / Admin@1234");
         }
     }

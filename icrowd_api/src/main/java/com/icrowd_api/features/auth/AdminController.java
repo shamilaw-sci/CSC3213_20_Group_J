@@ -1,5 +1,6 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.category.CategoryService;
 import com.icrowd_api.features.product.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -28,8 +30,11 @@ public class AdminController {
     // ── User Management ────────────────────────────────────────────────────────
 
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
+        List<UserProfileResponse> users = userService.getAllUsers().stream()
+                .map(UserProfileResponse::fromUser)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
     }
 
     @PatchMapping("/users/{id}/promote")

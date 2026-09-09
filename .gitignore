@@ -19,3 +19,4 @@ Thumbs.db
 # --- Security (The most important part!) ---
 .env
 .env.local
+icrowd_api/.env

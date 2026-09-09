@@ -13,14 +13,25 @@ import java.util.List;
 @Configuration
 public class ProductDataLoader {
 
+    /**
+     * Finds a category by name, or creates it if it does not yet exist.
+     * This makes the data loader idempotent — safe to run on every startup.
+     */
+    private Category findOrCreateCategory(CategoryRepository repo, String name, String description) {
+        return repo.findByName(name)
+                .orElseGet(() -> repo.save(
+                        Category.builder().name(name).description(description).build()
+                ));
+    }
+
     @Bean
     CommandLineRunner loadProductData(ProductRepository productRepository, CategoryRepository categoryRepository) {
         return args -> {
             if (productRepository.count() == 0) {
-                // 1. Create Categories
-                Category headsetCat = categoryRepository.save(Category.builder().name("Headset").description("Audio devices").build());
-                Category powerBankCat = categoryRepository.save(Category.builder().name("PowerBank").description("Portable chargers").build());
-                Category caseCat = categoryRepository.save(Category.builder().name("Case").description("Protective phone cases").build());
+                // 1. Create Categories (idempotent — won't duplicate if already present)
+                Category headsetCat   = findOrCreateCategory(categoryRepository, "Headset",   "Audio devices");
+                Category powerBankCat = findOrCreateCategory(categoryRepository, "PowerBank", "Portable chargers");
+                Category caseCat      = findOrCreateCategory(categoryRepository, "Case",      "Protective phone cases");
 
                 Category[] categories = {headsetCat, powerBankCat, caseCat};
 
@@ -50,7 +61,7 @@ public class ProductDataLoader {
                             .price(price)
                             .availableStock(stock)
                             .imageUrls(List.of(
-                                images[categoryIndex], 
+                                images[categoryIndex],
                                 "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80",
                                 "https://images.unsplash.com/photo-1523206489230-c012c64b2b48?w=500&q=80"
                             ))
@@ -59,8 +70,8 @@ public class ProductDataLoader {
                             .warranty("1 Year Official Warranty")
                             .deliveryInfo("Island-wide Delivery within 2-4 working days")
                             .features(List.of(
-                                "Active Noise Cancellation", 
-                                "30-Hour Battery Life", 
+                                "Active Noise Cancellation",
+                                "30-Hour Battery Life",
                                 "Water and Sweat Resistant"
                             ))
                             .specifications(java.util.Map.of(
