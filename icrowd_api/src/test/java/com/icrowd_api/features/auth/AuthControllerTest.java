@@ -109,7 +109,11 @@ public class AuthControllerTest {
         Mockito.when(authentication.getPrincipal()).thenReturn(userDetails);
         Mockito.when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
-        Mockito.when(jwtUtil.generateToken(userDetails)).thenReturn("mock-jwt-token");
+        // AuthController calls the 2-arg overload: generateToken(userDetails, role)
+        Mockito.when(jwtUtil.generateToken(any(org.springframework.security.core.userdetails.UserDetails.class), any(String.class)))
+                .thenReturn("mock-jwt-token");
+        // findByEmail must return an Optional (not null) so the role lookup doesn't NPE
+        Mockito.when(userService.findByEmail(email)).thenReturn(Optional.empty());
         Mockito.when(userService.getUserProfile(email)).thenReturn(Optional.of(new com.icrowd_api.features.auth.dto.UserProfileResponse()));
 
         ResponseEntity<?> response = authController.loginUser(loginData);
