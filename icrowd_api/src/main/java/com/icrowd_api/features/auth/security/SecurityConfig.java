@@ -36,6 +36,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Public auth endpoints
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                // Public AI Chatbot endpoints
+                .requestMatchers("/api/ai/**").permitAll()
                 // Public product read endpoints (customer store)
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)

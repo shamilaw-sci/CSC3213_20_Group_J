@@ -4,8 +4,9 @@ import { sendChatMessage } from '../api/chatApi';
 const DEFAULT_WELCOME_MESSAGE = {
   id: 'welcome',
   sender: 'bot',
-  text: 'ආයුබෝවන්! 👋 මම iCrowd AI Smart Phone & Accessories සහායකයා. ඔබට Flagship Smartphones (Apple iPhone 15 Pro, Samsung S24 Ultra, Pixel, Xiaomi) හෝ High-Quality Accessories (Headsets, Fast Chargers, MagSafe Cases) තෝරාගැනීමට මම සූදානම්. ඔබ සොයන්නේ කුමක්ද?',
+  text: 'ආයුබෝවන්! 👋 මම **iCrowd AI Smart Assistant**.\n\nඔබට අවශ්‍ය **Headsets, Fast Chargers, PowerBanks, Phone Cases** හෝ Delivery/Warranty තොරතුරු පහසුවෙන්ම සොයා ගැනීමට මට සහාය විය හැක. ඔබ සොයන්නේ කුමක්ද?',
   products: null,
+  suggestions: ['🎧 Headsets', '🔋 PowerBanks', '🛡️ Phone Cases', '🏷️ Best Deals', '🚚 Delivery Info'],
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
@@ -37,7 +38,7 @@ export const useAIChatbot = () => {
   }, [messages, isOpen, scrollToBottom]);
 
   const sendMessage = async (text) => {
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim() || loading) return;
 
     const userText = text.trim();
     const userMsg = {
@@ -58,16 +59,19 @@ export const useAIChatbot = () => {
         sender: 'bot',
         text: response.reply || 'මෙන්න ඔබගේ සෙවීමට ගැළපෙන හොඳම නිෂ්පාදන:',
         products: response.products || null,
+        suggestions: response.suggestions || null,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
-      // Fallback message if backend isn't responding
+      console.warn('AI Chat API fallback activated:', err);
+      // Graceful offline/fallback response in Sinhala
       const fallbackMsg = {
         id: 'bot_err_' + Date.now(),
         sender: 'bot',
-        text: 'සමාවෙන්න, Backend API සම්බන්ධ කර ගැනීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.',
+        text: 'සමාවෙන්න, සේවාදායකය හා සම්බන්ධ වීමේ කුඩා බාධාවක් ඇති විය. කරුණාකර තත්පර කිහිපයකින් නැවත උත්සාහ කරන්න හෝ පහත Quick Suggestions වලින් තෝරන්න.',
         products: null,
+        suggestions: ['🎧 Headsets', '🔋 PowerBanks', '🛡️ Phone Cases', '🚚 Delivery Info'],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -77,7 +81,13 @@ export const useAIChatbot = () => {
   };
 
   const clearChat = () => {
-    setMessages([DEFAULT_WELCOME_MESSAGE]);
+    setMessages([
+      {
+        ...DEFAULT_WELCOME_MESSAGE,
+        id: 'welcome_' + Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
   };
 
   return {
