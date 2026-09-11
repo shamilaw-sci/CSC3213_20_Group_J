@@ -2,10 +2,14 @@ package com.icrowd_api.features.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateProfileRequest {
@@ -19,12 +23,14 @@ public class UpdateProfileRequest {
     @NotBlank(message = "Phone number is required")
     private String phone;
 
-    @NotBlank(message = "Address is required")
+    private LocalDate dateOfBirth;
+
+    private String profileImage;
+
+    // Optional address fields for updating primary address if present
     private String address;
-
-    @NotBlank(message = "District is required")
     private String district;
-
-    @NotBlank(message = "City is required")
     private String city;
+    private String province;
+    private String postalCode;
 }
