@@ -37,6 +37,8 @@ public class AnalyticsSummaryDto {
         private BigDecimal predictedNextMonthRevenue;
         private Integer lowStockCount;
         private String topCategory;
+        private String selectedRange;
+        private String dateRangeLabel;
     }
 
     @Data

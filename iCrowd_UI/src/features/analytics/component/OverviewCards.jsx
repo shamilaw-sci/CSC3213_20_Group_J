@@ -13,15 +13,16 @@ const OverviewCards = ({ overview = {} }) => {
     predictedNextMonthRevenue = 0,
     lowStockCount = 0,
     topCategory = 'Headset',
+    dateRangeLabel = 'All Time',
   } = overview;
 
   const cards = [
     {
-      title: 'Total Revenue (YTD)',
+      title: `Revenue (${dateRangeLabel})`,
       value: `Rs ${Number(totalRevenue || 0).toLocaleString()}`,
-      subtext: `${totalUnitsSold?.toLocaleString() || 0} units sold in 2026`,
+      subtext: `${totalUnitsSold?.toLocaleString() || 0} units sold in period`,
       icon: '💵',
-      badge: '+18.4% YoY',
+      badge: '+18.4% Pace',
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       gradient: 'from-blue-600/20 to-indigo-600/5',
       borderColor: 'border-blue-500/30',

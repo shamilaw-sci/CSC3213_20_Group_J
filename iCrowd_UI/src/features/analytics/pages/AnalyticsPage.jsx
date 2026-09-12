@@ -7,11 +7,23 @@ import CategoryDistributionChart from '../component/CategoryDistributionChart';
 import RestockPredictionTable from '../component/RestockPredictionTable';
 import OpportunityInsightsCard from '../component/OpportunityInsightsCard';
 import InventoryHealthCard from '../component/InventoryHealthCard';
+import DateRangeFilter from '../component/DateRangeFilter';
+import ExportMenu from '../component/ExportMenu';
 
 const AnalyticsPage = () => {
-  const { data, loading, error, refresh } = useAnalyticsDashboard();
+  const {
+    data,
+    loading,
+    error,
+    range,
+    setRange,
+    customStartDate,
+    customEndDate,
+    applyCustomRange,
+    refresh,
+  } = useAnalyticsDashboard();
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center space-y-4">
         <div className="relative">
@@ -30,7 +42,7 @@ const AnalyticsPage = () => {
     );
   }
 
-  if (error || !data) {
+  if (error && !data) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-4">
         <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 text-2xl">
@@ -53,9 +65,25 @@ const AnalyticsPage = () => {
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Top Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Printable Executive Report Header (Visible only when Printing / Saving as PDF) */}
+      <div className="hidden print:block border-b-2 border-slate-700 pb-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">iCrowd E-Commerce Platform</h1>
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest mt-0.5">
+              Executive Business Intelligence & Inventory Health Report
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-700 font-bold">Scope: {data?.overview?.dateRangeLabel || 'All Time'}</p>
+            <p className="text-[11px] text-slate-500">Report Date: {new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Page Header (Screen UI) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
@@ -70,47 +98,66 @@ const AnalyticsPage = () => {
           </p>
         </div>
 
-        <button
-          onClick={refresh}
-          className="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 px-4 py-2 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm w-fit"
-        >
-          <span>🔄</span>
-          <span>Refresh Data</span>
-        </button>
+        {/* Action Controls: Refresh & Export */}
+        <div className="flex items-center gap-3">
+          <ExportMenu data={data} />
+
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 px-4 py-2 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm disabled:opacity-50"
+            title="Refresh database records"
+          >
+            <span className={loading ? 'animate-spin' : ''}>🔄</span>
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Date Range Filter Bar (Screen UI) */}
+      <div className="print:hidden">
+        <DateRangeFilter
+          activeRange={range}
+          onSelectRange={setRange}
+          customStartDate={customStartDate}
+          customEndDate={customEndDate}
+          onApplyCustomRange={applyCustomRange}
+          dateRangeLabel={data?.overview?.dateRangeLabel}
+        />
       </div>
 
       {/* 1. Overview KPI Cards */}
-      <OverviewCards overview={data.overview} />
+      <OverviewCards overview={data?.overview} />
 
       {/* 2. Primary Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <SalesForecastChart data={data.salesForecast} />
+          <SalesForecastChart data={data?.salesForecast || []} />
         </div>
         <div className="lg:col-span-1">
-          <CategoryDistributionChart data={data.inventoryDistribution} />
+          <CategoryDistributionChart data={data?.inventoryDistribution || []} />
         </div>
       </div>
 
       {/* 3. Profitability & Financials Breakdown */}
       <div id="profit">
-        <ProfitAnalysisChart data={data.profitAnalysis} />
+        <ProfitAnalysisChart data={data?.profitAnalysis || []} />
       </div>
 
       {/* 4. AI Strategic Opportunity & Restock Forecast */}
       <div id="insights" className="space-y-6">
         <OpportunityInsightsCard
-          insights={data.opportunityInsights}
-          aiRecommendation={data.aiRecommendation}
+          insights={data?.opportunityInsights}
+          aiRecommendation={data?.aiRecommendation}
         />
-        <RestockPredictionTable predictions={data.restockPredictions} />
+        <RestockPredictionTable predictions={data?.restockPredictions || []} />
       </div>
 
       {/* 5. Inventory Stock Health & Top Products */}
       <div id="inventory">
         <InventoryHealthCard
-          lowStockItems={data.inventoryHealth?.lowStockItems || []}
-          topProducts={data.topProducts || []}
+          lowStockItems={data?.inventoryHealth?.lowStockItems || []}
+          topProducts={data?.topProducts || []}
         />
       </div>
     </div>
@@ -118,3 +165,4 @@ const AnalyticsPage = () => {
 };
 
 export default AnalyticsPage;
+
