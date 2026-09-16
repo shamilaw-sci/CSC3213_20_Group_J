@@ -36,6 +36,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Public auth endpoints
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                // Public AI Chatbot endpoints
+                .requestMatchers("/api/ai/**").permitAll()
                 // Public product read endpoints (customer store)
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)
@@ -51,8 +53,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
-                // All /api/admin/** require ADMIN role
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // All /api/admin/** and /api/analytics/** require ADMIN role
+                .requestMatchers("/api/admin/**", "/api/analytics/**").hasRole("ADMIN")
                 // Auth/me and create-admin require authentication
                 .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
                 // User profile and address endpoints require authentication

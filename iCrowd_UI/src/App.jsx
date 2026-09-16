@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout.jsx';
 import AdminLayout from './components/layout/AdminLayout.jsx';
 import LandingPage from './features/products/pages/LandingPage.jsx';
@@ -14,11 +14,12 @@ import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminProducts from './features/admin/pages/AdminProducts.jsx';
 import AdminCategories from './features/admin/pages/AdminCategories.jsx';
 import AdminUsers from './features/admin/pages/AdminUsers.jsx';
+import AnalyticsPage from './features/analytics/pages/AnalyticsPage.jsx';
 import ProfilePage from './features/user/pages/ProfilePage.jsx';
 import ProtectedRoute from './features/auth/component/ProtectedRoute.jsx';
 import CartPage from './features/cart/pages/CartPage.jsx';
 
-// Checkout
+// Checkout Flow
 import CheckoutLayout from './features/checkout/components/CheckoutLayout.jsx';
 import ShippingPage from './features/checkout/pages/ShippingPage.jsx';
 import PaymentPage from './features/checkout/pages/PaymentPage.jsx';
@@ -48,34 +49,57 @@ function App() {
               <Route path="/cart" element={<CartPage />} />
 
               {/* Protected User Routes */}
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* ── Checkout Routes (CheckoutLayout) ──────────────────────────── */}
-            <Route path="/checkout/shipping" element={
-              <ProtectedRoute>
-                <CheckoutLayout><ShippingPage /></CheckoutLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/checkout/payment" element={
-              <ProtectedRoute>
-                <CheckoutLayout><PaymentPage /></CheckoutLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/checkout/success" element={
-              <ProtectedRoute>
-                <CheckoutLayout><CheckoutSuccessPage /></CheckoutLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/checkout/error" element={
-              <ProtectedRoute>
-                <CheckoutLayout><CheckoutErrorPage /></CheckoutLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/checkout/shipping"
+              element={
+                <ProtectedRoute>
+                  <CheckoutLayout>
+                    <ShippingPage />
+                  </CheckoutLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/payment"
+              element={
+                <ProtectedRoute>
+                  <CheckoutLayout>
+                    <PaymentPage />
+                  </CheckoutLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/success"
+              element={
+                <ProtectedRoute>
+                  <CheckoutLayout>
+                    <CheckoutSuccessPage />
+                  </CheckoutLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/error"
+              element={
+                <ProtectedRoute>
+                  <CheckoutLayout>
+                    <CheckoutErrorPage />
+                  </CheckoutLayout>
+                </ProtectedRoute>
+              }
+            />
 
             {/* ── Admin routes (sidebar layout, no Navbar) ──────────────────── */}
             <Route
@@ -87,10 +111,14 @@ function App() {
               }
             >
               <Route index element={<AdminDashboard />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="products" element={<AdminProducts />} />
               <Route path="categories" element={<AdminCategories />} />
               <Route path="users" element={<AdminUsers />} />
             </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </CartProvider>
