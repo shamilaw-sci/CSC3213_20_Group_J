@@ -10,8 +10,14 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    @Modifying
+    @Query("UPDATE Product p SET p.availableStock = p.availableStock - :quantity WHERE p.id = :productId AND p.availableStock >= :quantity")
+    int atomicDecrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
     // Customer-facing: only active products
     Page<Product> findByIsActiveTrue(Pageable pageable);

@@ -15,8 +15,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.hibernate.annotations.Check;
+
 @Entity
 @Table(name = "products")
+@Check(constraints = "available_stock >= 0")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

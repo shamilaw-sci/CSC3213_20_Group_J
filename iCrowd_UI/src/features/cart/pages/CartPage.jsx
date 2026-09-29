@@ -4,17 +4,20 @@ import CartItem from '../components/CartItem.jsx';
 import OrderSummary from '../components/OrderSummary.jsx';
 import ProductGrid from '../../products/components/ProductGrid.jsx';
 import { useProducts } from '../../products/hooks/useProducts.js';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, ShoppingBag, AlertTriangle } from 'lucide-react';
 
 const CartPage = () => {
   const { cart, updateQuantity, removeFromCart, getCartTotal, getItemCount } = useCart();
-  const { products, loading } = useProducts(); // Reusing the hook for suggestions
+  const { products, loading } = useProducts(); 
+  const location = useLocation();
 
-  // Just grab some random products for "You may like"
   const suggestedProducts = products.slice(0, 4);
-
   const navigate = useNavigate();
+
+  // Find if there's a specific product that failed during checkout
+  const outOfStockProductId = location.state?.outOfStockProductId;
+  const failedItem = outOfStockProductId ? cart.find(i => i.product.id === outOfStockProductId) : null;
 
   const handleCheckout = () => {
     navigate('/checkout/shipping');
@@ -59,6 +62,18 @@ const CartPage = () => {
         </Link>
       </div>
 
+      {failedItem && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded-r-xl shadow-sm flex items-start gap-4">
+          <AlertTriangle className="text-red-500 w-6 h-6 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-red-800 font-bold text-lg mb-1">Items in your cart sold out!</h3>
+            <p className="text-red-700">
+              We're sorry, but <span className="font-bold">{failedItem.product.name}</span> sold out while you were checking out. Please remove it from your cart to proceed with the rest of your order.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-12 mb-20">
         
         {/* Cart Items List */}
@@ -70,6 +85,7 @@ const CartPage = () => {
                 item={item} 
                 updateQuantity={updateQuantity}
                 removeFromCart={removeFromCart}
+                isSoldOut={outOfStockProductId === item.product.id}
               />
             ))}
           </div>
@@ -79,9 +95,10 @@ const CartPage = () => {
         <div className="lg:w-1/3">
           <div className="sticky top-24">
             <OrderSummary 
-              total={getCartTotal()} 
-              itemCount={getItemCount()}
+              total={getCartTotal() - (failedItem ? (failedItem.product.price * failedItem.quantity) : 0)} 
+              itemCount={getItemCount() - (failedItem ? failedItem.quantity : 0)}
               onCheckout={handleCheckout}
+              disabled={!!failedItem}
             />
           </div>
         </div>

@@ -75,6 +75,16 @@ const PaymentPage = () => {
 
     } catch (err) {
       console.error(err);
+      
+      // Check for our custom OUT_OF_STOCK race condition error (409 Conflict)
+      if (err.response?.status === 409 && err.response?.data?.error === 'OUT_OF_STOCK') {
+          const failedProductId = err.response.data.productId;
+          navigate('/cart', {
+              state: { outOfStockProductId: failedProductId }
+          });
+          return;
+      }
+
       // Determine error type for routing
       const errorMsg = err.response?.data?.message || err.message || "An unexpected error occurred.";
       
