@@ -52,9 +52,11 @@ public class OrderService {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemDto.getProductId()));
 
-            // Basic stock check (will be replaced by atomic query in next phase)
-            if (product.getAvailableStock() < itemDto.getQuantity()) {
-                throw new RuntimeException("Insufficient stock for product: " + product.getName());
+            // Execute atomic decrement
+            int rowsUpdated = productRepository.atomicDecrementStock(product.getId(), itemDto.getQuantity());
+            if (rowsUpdated == 0) {
+                // The decrement failed because availableStock < quantity, or product didn't exist
+                throw new OutOfStockException(product.getId(), product.getName());
             }
 
             OrderItem orderItem = OrderItem.builder()

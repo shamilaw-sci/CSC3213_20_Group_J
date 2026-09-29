@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 
-const OrderSummary = ({ total, itemCount, onCheckout }) => {
+const OrderSummary = ({ total, itemCount, onCheckout, disabled = false }) => {
   return (
     <div className="bg-[#F6F6F6] rounded-[32px] p-6 sm:p-8">
       <h2 className="text-xl font-bold text-black mb-6">Order Summary</h2>
@@ -42,10 +42,11 @@ const OrderSummary = ({ total, itemCount, onCheckout }) => {
 
       <button 
         onClick={onCheckout}
-        className="w-full bg-black text-white rounded-full py-4 px-6 font-bold text-lg flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors active:scale-[0.98]"
+        disabled={disabled}
+        className={`w-full rounded-full py-4 px-6 font-bold text-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98] ${disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-800'}`}
       >
-        Proceed to Checkout
-        <ArrowRight size={20} />
+        {disabled ? 'Please remove sold out items' : 'Proceed to Checkout'}
+        {!disabled && <ArrowRight size={20} />}
       </button>
     </div>
   );

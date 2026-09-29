@@ -34,6 +34,10 @@ public class OrderController {
             String email = authentication.getName();
             Order order = orderService.createOrder(email, request);
             return ResponseEntity.ok(order);
+        } catch (OutOfStockException e) {
+            return ResponseEntity.status(409).body(
+                java.util.Map.of("error", "OUT_OF_STOCK", "productId", e.getProductId())
+            );
         } catch (Exception e) {
             // Very basic error handling for now
             return ResponseEntity.badRequest().body(e.getMessage());
