@@ -55,4 +55,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // Recent products (admin)
     @Query("SELECT p FROM Product p ORDER BY p.createdAt DESC")
     List<Product> findRecentProducts(Pageable pageable);
+
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.category.id IN :categoryIds ORDER BY p.averageRating DESC")
+    Page<Product> findTopProductsByCategories(@Param("categoryIds") List<Long> categoryIds, Pageable pageable);
+
+    // Similar products in same category, excluding a specific product
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.category.id = :categoryId AND p.id != :excludeId ORDER BY p.averageRating DESC")
+    Page<Product> findSimilarProductsByCategory(
+            @Param("categoryId") Long categoryId,
+            @Param("excludeId") Long excludeId,
+            Pageable pageable);
 }

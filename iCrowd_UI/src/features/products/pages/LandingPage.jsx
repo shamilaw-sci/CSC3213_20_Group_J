@@ -1,17 +1,49 @@
-import React from 'react';
-import ProductGrid from '../components/ProductGrid';
-import { useProducts } from '../hooks/useProducts';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import ProductSlider from '../components/ProductSlider';
+import { 
+  fetchFeaturedProducts, 
+  fetchLatestProducts, 
+  fetchRecommendedProducts 
+} from '../api/recommendationApi';
 
 const LandingPage = () => {
-  // Fetch products (for now, fetching all active products)
-  const { products, loading, error } = useProducts();
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [latestProducts, setLatestProducts] = useState([]);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadAllSections = async () => {
+      setLoading(true);
+      try {
+        const [featured, latest, recommended] = await Promise.all([
+          fetchFeaturedProducts(8),
+          fetchLatestProducts(8),
+          fetchRecommendedProducts(8),
+        ]);
+
+        if (isMounted) {
+          setFeaturedProducts(featured || []);
+          setLatestProducts(latest || []);
+          setRecommendedProducts(recommended || []);
+        }
+      } catch (err) {
+        console.error("Error loading home sections:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadAllSections();
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <div className="w-full">
       {/* Hero Banner Component */}
       <div className="bg-[#0a0a0a] border-b border-gray-900 pt-32 pb-24 text-center px-4 overflow-hidden relative">
-        {/* Subtle glow effect behind text */}
         <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
           <div className="w-3/4 h-3/4 bg-white/5 rounded-full blur-[100px]"></div>
         </div>
@@ -45,14 +77,30 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* Featured Products */}
-      <div className="max-w-7xl mx-auto px-4 pb-20">
-        <ProductGrid 
-          products={products.slice(0, 6)}
+      {/* Suggestion Sections */}
+      <div className="max-w-7xl mx-auto px-4 pb-20 space-y-8">
+        {/* 1. Featured Products (Highest Sales in Recent Times) */}
+        <ProductSlider 
+          title="Featured Products"
+          subtitle="Top-selling gear and highest sales in recent weeks."
+          products={featuredProducts}
           loading={loading}
-          error={error}
-          title="Featured Devices & Gear"
-          subtitle="Hand-picked smartphones and essentials for your setup."
+        />
+
+        {/* 2. Latest Arrivals (Newly Added Products) */}
+        <ProductSlider 
+          title="Latest Arrivals"
+          subtitle="Freshly added gear and newly introduced devices."
+          products={latestProducts}
+          loading={loading}
+        />
+
+        {/* 3. Products You May Like (Personalized based on user purchases/cart + trending fallback) */}
+        <ProductSlider 
+          title="Products You May Like"
+          subtitle="Curated picks personalized for you."
+          products={recommendedProducts}
+          loading={loading}
         />
       </div>
     </div>
