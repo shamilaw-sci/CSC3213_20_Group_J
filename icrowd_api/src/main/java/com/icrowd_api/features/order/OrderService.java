@@ -6,9 +6,12 @@ import com.icrowd_api.features.order.dto.CheckoutItemDto;
 import com.icrowd_api.features.order.dto.CheckoutRequest;
 import com.icrowd_api.features.product.Product;
 import com.icrowd_api.features.product.ProductRepository;
+import com.icrowd_api.features.promo.PromoCodeService;
+import com.icrowd_api.features.promo.PromoValidationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -24,6 +27,9 @@ public class OrderService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PromoCodeService promoCodeService;
 
     @Transactional
     public Order createOrder(String email, CheckoutRequest request) {
@@ -75,16 +81,38 @@ public class OrderService {
         order.setSubTotal(subTotal);
 
         // Simple shipping logic for now
-        BigDecimal shippingCost = request.getDeliveryType() == DeliveryType.FAST 
-            ? new BigDecimal("500.00") 
+        BigDecimal shippingCost = request.getDeliveryType() == DeliveryType.FAST
+            ? new BigDecimal("500.00")
             : new BigDecimal("200.00");
-            
-        order.setShippingCost(shippingCost);
-        order.setTotalAmount(subTotal.add(shippingCost));
 
-        return orderRepository.save(order);
+        order.setShippingCost(shippingCost);
+
+        // Apply promo code discount if provided
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (StringUtils.hasText(request.getPromoCode())) {
+            PromoValidationResponse validation =
+                    promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            if (validation.isValid()) {
+                discountAmount = validation.getDiscountAmount();
+                order.setDiscountAmount(discountAmount);
+                // appliedPromoCode FK is set inside applyCodeToOrder below (after save)
+            }
+            // If the code is somehow invalid at checkout time we silently skip it
+            // (the frontend already validated; this is a last-resort guard)
+        }
+
+        order.setTotalAmount(subTotal.subtract(discountAmount).add(shippingCost).max(BigDecimal.ZERO));
+
+        Order savedOrder = orderRepository.save(order);
+
+        // Record promo usage AFTER the order is persisted so the FK is valid
+        if (StringUtils.hasText(request.getPromoCode()) && discountAmount.compareTo(BigDecimal.ZERO) > 0) {
+            promoCodeService.applyCodeToOrder(request.getPromoCode(), user, savedOrder);
+        }
+
+        return savedOrder;
     }
-    
+
     @Transactional
     public void updateReceiptUrl(Long orderId, String receiptUrl) {
         Order order = orderRepository.findById(orderId)
