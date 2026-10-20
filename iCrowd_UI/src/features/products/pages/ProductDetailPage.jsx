@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useProductDetail } from '../hooks/useProductDetail';
-import { useProducts } from '../hooks/useProducts';
-import ProductGrid from '../components/ProductGrid';
+import ProductSlider from '../components/ProductSlider';
+import { fetchSimilarProducts } from '../api/recommendationApi';
 import { Star } from 'lucide-react';
 
 import ProductImageGallery from '../components/ProductImageGallery';
@@ -15,11 +15,27 @@ const ProductDetailPage = () => {
   const { id } = useParams();
   
   const { product, loading, error } = useProductDetail(id);
-  
-  const { products: allProducts } = useProducts(); 
-  const suggestedProducts = allProducts
-    .filter(p => p.id !== Number(id))
-    .slice(0, 4);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let isMounted = true;
+    setSimilarLoading(true);
+
+    fetchSimilarProducts(id, 8)
+      .then((data) => {
+        if (isMounted) setSimilarProducts(data || []);
+      })
+      .catch((err) => {
+        console.error("Error loading similar products:", err);
+      })
+      .finally(() => {
+        if (isMounted) setSimilarLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [id]);
 
   if (loading) {
     return (
@@ -128,10 +144,12 @@ const ProductDetailPage = () => {
         <p className="text-gray-500 font-medium italic">No reviews yet. Be the first to review this product!</p>
       </div>
 
-      {/* 3. Product Grid (Reused for Suggestions!) */}
-      <ProductGrid 
-        products={suggestedProducts} 
-        title="You Might Also Like"
+      {/* 3. Product Slider for Similar Suggestions */}
+      <ProductSlider 
+        products={similarProducts} 
+        loading={similarLoading}
+        title="You May Also Like"
+        subtitle="Related products matched to this item and your taste."
       />
 
     </div>

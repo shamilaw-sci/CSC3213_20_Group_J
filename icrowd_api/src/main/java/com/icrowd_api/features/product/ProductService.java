@@ -1,7 +1,11 @@
 package com.icrowd_api.features.product;
 
+import com.icrowd_api.features.auth.UserRepository;
+import com.icrowd_api.features.cart.CartRepository;
 import com.icrowd_api.features.category.Category;
 import com.icrowd_api.features.category.CategoryRepository;
+import com.icrowd_api.features.order.OrderItemRepository;
+import com.icrowd_api.features.order.OrderRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -9,10 +13,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,10 +28,23 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final CartRepository cartRepository;
+    private final UserRepository userRepository;
 
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public ProductService(ProductRepository productRepository, 
+                          CategoryRepository categoryRepository,
+                          OrderRepository orderRepository,
+                          OrderItemRepository orderItemRepository,
+                          CartRepository cartRepository,
+                          UserRepository userRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.cartRepository = cartRepository;
+        this.userRepository = userRepository;
     }
 
     // ── Customer-facing ────────────────────────────────────────────────────────
@@ -189,5 +210,165 @@ public class ProductService {
 
     public List<Product> getRecentProducts(int limit) {
         return productRepository.findRecentProducts(PageRequest.of(0, limit));
+    }
+
+    // ── Recommendations ────────────────────────────────────────────────────────
+    
+    public List<Product> getRecommendedProducts(String userEmail, int limit) {
+        List<Product> recommendations = new ArrayList<>();
+        
+        // 1. Personalized Recommendations (if user is authenticated)
+        if (userEmail != null) {
+            userRepository.findByEmail(userEmail).ifPresent(user -> {
+                Set<Long> favoriteCategoryIds = new HashSet<>();
+                favoriteCategoryIds.addAll(orderRepository.findUserPurchasedCategoryIds(user.getId()));
+                favoriteCategoryIds.addAll(cartRepository.findUserCartCategoryIds(user.getId()));
+                
+                if (!favoriteCategoryIds.isEmpty()) {
+                    int personalizedLimit = limit / 2; // 50% personalized
+                    recommendations.addAll(productRepository.findTopProductsByCategories(
+                            new ArrayList<>(favoriteCategoryIds), PageRequest.of(0, personalizedLimit)).getContent());
+                }
+            });
+        }
+        
+        // 2. Trending Products (Last 30 days)
+        int remainingLimit = limit - recommendations.size();
+        if (remainingLimit > 0) {
+            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+            List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, remainingLimit * 2));
+            
+            Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
+                    .filter(Product::getIsActive)
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+            
+            List<Product> trendingProducts = new ArrayList<>();
+            for (Long id : topSellingIds) {
+                if (productMap.containsKey(id)) {
+                    trendingProducts.add(productMap.get(id));
+                }
+            }
+                    
+            recommendations.addAll(trendingProducts);
+        }
+        
+        // 3. Fallback: If still under limit (e.g., brand-new site with few/no orders yet),
+        // fill with highest-rated and newest active products
+        if (recommendations.size() < limit) {
+            Page<Product> fallbackPage = productRepository.findByIsActiveTrue(
+                    PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
+            );
+            if (fallbackPage != null && fallbackPage.getContent() != null) {
+                for (Product p : fallbackPage.getContent()) {
+                    if (!recommendations.contains(p)) {
+                        recommendations.add(p);
+                    }
+                    if (recommendations.size() >= limit) break;
+                }
+            }
+        }
+        
+        // Return exactly 'limit' distinct products
+        return recommendations.stream().distinct().limit(limit).collect(Collectors.toList());
+    }
+
+    public List<Product> getFeaturedProducts(int limit) {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, limit * 2));
+
+        List<Product> featured = new ArrayList<>();
+        if (!topSellingIds.isEmpty()) {
+            Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
+                    .filter(Product::getIsActive)
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+
+            for (Long id : topSellingIds) {
+                if (productMap.containsKey(id)) {
+                    featured.add(productMap.get(id));
+                }
+            }
+        }
+
+        // Fallback: If not enough sales records, backfill with top-rated active products
+        if (featured.size() < limit) {
+            Page<Product> fallbackPage = productRepository.findByIsActiveTrue(
+                    PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
+            );
+            if (fallbackPage != null && fallbackPage.getContent() != null) {
+                for (Product p : fallbackPage.getContent()) {
+                    if (!featured.contains(p)) {
+                        featured.add(p);
+                    }
+                    if (featured.size() >= limit) break;
+                }
+            }
+        }
+
+        return featured.stream().distinct().limit(limit).collect(Collectors.toList());
+    }
+
+    public List<Product> getLatestProducts(int limit) {
+        return productRepository.findByIsActiveTrue(
+                PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"))
+        ).getContent();
+    }
+
+    public List<Product> getSimilarProducts(Long productId, String userEmail, int limit) {
+        Product currentProduct = productRepository.findByIdAndIsActiveTrue(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found or inactive"));
+
+        List<Product> similar = new ArrayList<>(productRepository.findSimilarProductsByCategory(
+                currentProduct.getCategory().getId(), productId, PageRequest.of(0, limit * 2)
+        ).getContent());
+
+        // Supplement with customer recommendations if available
+        if (similar.size() < limit) {
+            List<Product> personalized = getRecommendedProducts(userEmail, limit);
+            for (Product p : personalized) {
+                if (!similar.contains(p) && !p.getId().equals(productId)) {
+                    similar.add(p);
+                }
+                if (similar.size() >= limit) break;
+            }
+        }
+
+        return similar.stream().distinct().limit(limit).collect(Collectors.toList());
+    }
+
+    public List<Product> getCartSuggestions(List<Long> cartProductIds, String userEmail, int limit) {
+        List<Long> safeCartIds = cartProductIds != null ? cartProductIds : List.of();
+        List<Product> suggestions = new ArrayList<>();
+
+        if (!safeCartIds.isEmpty()) {
+            // Find categories for items currently in cart
+            Set<Long> cartCategoryIds = productRepository.findAllById(safeCartIds).stream()
+                    .map(p -> p.getCategory().getId())
+                    .collect(Collectors.toSet());
+
+            if (!cartCategoryIds.isEmpty()) {
+                List<Product> categoryProducts = productRepository.findTopProductsByCategories(
+                        new ArrayList<>(cartCategoryIds), PageRequest.of(0, limit * 2)
+                ).getContent();
+
+                for (Product p : categoryProducts) {
+                    if (!safeCartIds.contains(p.getId())) {
+                        suggestions.add(p);
+                    }
+                }
+            }
+        }
+
+        // If cart is empty or still under limit, backfill with user personalized / trending recommendations
+        if (suggestions.size() < limit) {
+            List<Product> fallbackRecommendations = getRecommendedProducts(userEmail, limit * 2);
+            for (Product p : fallbackRecommendations) {
+                if (!safeCartIds.contains(p.getId()) && !suggestions.contains(p)) {
+                    suggestions.add(p);
+                }
+                if (suggestions.size() >= limit) break;
+            }
+        }
+
+        return suggestions.stream().distinct().limit(limit).collect(Collectors.toList());
     }
 }

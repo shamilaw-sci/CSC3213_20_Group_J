@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,6 +50,50 @@ public class ProductController {
     public ResponseEntity<SuggestionResponse> getSuggestions(@RequestParam String q) {
         return ResponseEntity.ok(productService.getSearchSuggestions(q));
     }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<Product>> getRecommendations(
+            Authentication authentication,
+            @RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(productService.getRecommendedProducts(resolveUserEmail(authentication), limit));
+    }
+
+    @GetMapping("/featured")
+    public ResponseEntity<List<Product>> getFeatured(
+            @RequestParam(defaultValue = "6") int limit) {
+        return ResponseEntity.ok(productService.getFeaturedProducts(limit));
+    }
+
+    @GetMapping("/latest")
+    public ResponseEntity<List<Product>> getLatest(
+            @RequestParam(defaultValue = "6") int limit) {
+        return ResponseEntity.ok(productService.getLatestProducts(limit));
+    }
+
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<List<Product>> getSimilar(
+            @PathVariable Long id,
+            Authentication authentication,
+            @RequestParam(defaultValue = "6") int limit) {
+        return ResponseEntity.ok(productService.getSimilarProducts(id, resolveUserEmail(authentication), limit));
+    }
+
+    @GetMapping("/cart-suggestions")
+    public ResponseEntity<List<Product>> getCartSuggestions(
+            @RequestParam(required = false) List<Long> productIds,
+            Authentication authentication,
+            @RequestParam(defaultValue = "6") int limit) {
+        return ResponseEntity.ok(productService.getCartSuggestions(productIds, resolveUserEmail(authentication), limit));
+    }
+
+    private String resolveUserEmail(Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated() && 
+            !"anonymousUser".equals(authentication.getPrincipal())) {
+            return authentication.getName();
+        }
+        return null;
+    }
+
 
     // ── Admin CRUD ─────────────────────────────────────────────────────────────
 
