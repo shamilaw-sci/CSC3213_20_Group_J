@@ -82,8 +82,10 @@ public class Product {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Builder.Default
     private Double averageRating = 0.0;
 
+    @Builder.Default
     private Integer reviewCount = 0;
 
     @CreationTimestamp
