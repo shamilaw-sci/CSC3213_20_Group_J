@@ -50,6 +50,15 @@ const navItems = [
             </svg>
         ),
     },
+    {
+        to: '/admin/promo-codes',
+        label: 'Promo Codes',
+        icon: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M3 5.5A2.5 2.5 0 015.5 3h13A2.5 2.5 0 0121 5.5v2a2.5 2.5 0 01-.732 1.768l-7 7a2.5 2.5 0 01-3.536 0l-7-7A2.5 2.5 0 013 7.5v-2z" />
+            </svg>
+        ),
+    },
 ];
 
 const AdminSidebar = () => {
