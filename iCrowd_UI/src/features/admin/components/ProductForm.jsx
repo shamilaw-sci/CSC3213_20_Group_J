@@ -47,7 +47,7 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-        if (errors[name]) setErrors(prev => { const n = {...prev}; delete n[name]; return n; });
+        if (errors[name]) setErrors(prev => { const n = { ...prev }; delete n[name]; return n; });
     };
 
     const handleSubmit = (e) => {
@@ -69,35 +69,41 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
         onSubmit(payload);
     };
 
-    const Field = ({ label, name, type = 'text', required, children, hint }) => (
-        <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                {label} {required && <span className="text-red-400">*</span>}
-            </label>
-            {children || (
-                <input
-                    type={type}
-                    name={name}
-                    value={form[name]}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900/10 ${
-                        errors[name] ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                />
-            )}
-            {hint && !errors[name] && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
-            {errors[name] && <p className="text-xs text-red-500 mt-1">{errors[name]}</p>}
-        </div>
-    );
-
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* SKU + Name */}
             <div className="grid grid-cols-2 gap-4">
-                <Field label="SKU" name="sku" />
-                <Field label="Name" name="name" required />
+                <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">SKU</label>
+                    <input
+                        type="text"
+                        name="sku"
+                        value={form.sku}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm transition-colors hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Name <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="name"
+                        value={form.name}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900/10 ${
+                            errors.name ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                    />
+                    {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                </div>
             </div>
 
-            <Field label="Description" name="description">
+            {/* Description */}
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Description</label>
                 <textarea
                     name="description"
                     value={form.description}
@@ -105,9 +111,13 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
                     rows={3}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-colors resize-none"
                 />
-            </Field>
+            </div>
 
-            <Field label="Category" name="categoryId" required>
+            {/* Category */}
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Category <span className="text-red-400">*</span>
+                </label>
                 <select
                     name="categoryId"
                     value={form.categoryId}
@@ -122,26 +132,59 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
                     ))}
                 </select>
                 {errors.categoryId && <p className="text-xs text-red-500 mt-1">{errors.categoryId}</p>}
-            </Field>
-
-            <div className="grid grid-cols-2 gap-4">
-                <Field label="Price (LKR)" name="price" type="number" required />
-                <Field label="Stock" name="availableStock" type="number" required />
             </div>
 
-            <Field label="Image URLs" name="imageUrls" hint="One URL per line">
+            {/* Price + Stock */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Price (LKR) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        name="price"
+                        value={form.price}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900/10 ${
+                            errors.price ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                    />
+                    {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
+                </div>
+                <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Stock <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        name="availableStock"
+                        value={form.availableStock}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900/10 ${
+                            errors.availableStock ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                    />
+                    {errors.availableStock && <p className="text-xs text-red-500 mt-1">{errors.availableStock}</p>}
+                </div>
+            </div>
+
+            {/* Image URLs */}
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Image URLs</label>
                 <textarea
                     name="imageUrls"
                     value={form.imageUrls}
                     onChange={handleChange}
                     rows={3}
-                    placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
+                    placeholder={"https://example.com/image1.jpg\nhttps://example.com/image2.jpg"}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-colors resize-none font-mono text-xs"
                 />
                 <p className="text-xs text-gray-400 mt-1">One URL per line</p>
-            </Field>
+            </div>
 
-            <Field label="Tags" name="tags" hint="Comma-separated e.g. electronics, sale">
+            {/* Tags */}
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Tags</label>
                 <input
                     type="text"
                     name="tags"
@@ -151,8 +194,9 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-colors"
                 />
                 <p className="text-xs text-gray-400 mt-1">Comma-separated</p>
-            </Field>
+            </div>
 
+            {/* Active toggle */}
             <label className="flex items-center gap-3 cursor-pointer">
                 <input
                     type="checkbox"
@@ -164,6 +208,7 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
                 <span className="text-sm font-medium text-gray-700">Active (visible in store)</span>
             </label>
 
+            {/* Actions */}
             <div className="flex gap-3 pt-2">
                 <button
                     type="button"
