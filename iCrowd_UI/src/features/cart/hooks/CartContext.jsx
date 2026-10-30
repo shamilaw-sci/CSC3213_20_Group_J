@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { syncCartWithBackend } from '../api/cartApi';
 
@@ -8,6 +8,8 @@ export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const { isAuthenticated } = useAuth();
+  const revision = useRef(0);
+  const syncQueue = useRef(Promise.resolve());
   
   // Load initial state from localStorage
   const [cart, setCart] = useState(() => {
@@ -33,7 +35,9 @@ export const CartProvider = ({ children }) => {
     if (isAuthenticated) {
       const syncCart = async () => {
         try {
+          const initialRevision = revision.current;
           const serverCart = await syncCartWithBackend(cart);
+          if (revision.current !== initialRevision) return;
           if (serverCart && serverCart.items) {
              setCart(serverCart.items.map(dbItem => ({
                product: dbItem.product,
@@ -50,9 +54,11 @@ export const CartProvider = ({ children }) => {
 
   // Helper to persist backend if authenticated
   const notifyBackendIfAuth = async (newCartState) => {
+    revision.current += 1;
     if (isAuthenticated) {
         try {
-          await syncCartWithBackend(newCartState);
+          syncQueue.current = syncQueue.current.catch(() => {}).then(() => syncCartWithBackend(newCartState));
+          await syncQueue.current;
         } catch (error) {
             console.error("Failed to push cart update to backend", error);
         }
@@ -112,6 +118,20 @@ export const CartProvider = ({ children }) => {
     });
   };
 
+  const completeCheckout = (orderId, items) => {
+    const key = 'completed-order-' + orderId;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, 'true');
+    setCart(previous => {
+      const next = previous.map(item => {
+        const purchased = items.filter(x => x.productId === item.product.id).reduce((n,x) => n + x.quantity, 0);
+        return { ...item, quantity: Math.max(0, item.quantity - purchased) };
+      }).filter(item => item.quantity > 0);
+      notifyBackendIfAuth(next);
+      return next;
+    });
+  };
+
   const clearCart = () => {
     setCart([]);
     notifyBackendIfAuth([]);
@@ -137,6 +157,7 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         updateQuantity,
         clearCart,
+        completeCheckout,
         getCartTotal,
         getItemCount,
         isProductInCart

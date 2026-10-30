@@ -37,11 +37,16 @@ public class CartService {
         cart.getItems().clear();
 
         if (request.getItems() != null) {
+            java.util.Set<Long> seen = new java.util.HashSet<>();
             for (CartSyncItemDto itemDto : request.getItems()) {
+                if (itemDto == null || itemDto.getProductId() == null || itemDto.getQuantity() == null || itemDto.getQuantity() <= 0)
+                    throw new IllegalArgumentException("Positive quantity and product ID are required");
+                if (!seen.add(itemDto.getProductId())) throw new IllegalArgumentException("Duplicate cart product");
                 Optional<Product> productOpt = productRepository.findById(itemDto.getProductId());
                 if (productOpt.isPresent()) {
                     Product product = productOpt.get();
-                    // Optional: Check available stock here if we want to sanitize
+                    if (!Boolean.TRUE.equals(product.getIsActive())) continue;
+                    // Carts do not reserve inventory.
                     CartItem cartItem = CartItem.builder()
                             .cart(cart)
                             .product(product)

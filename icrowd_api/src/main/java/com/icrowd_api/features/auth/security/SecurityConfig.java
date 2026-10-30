@@ -24,6 +24,8 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -61,6 +63,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/users/**").authenticated()
                 // Cart and order endpoints require authentication
                 .requestMatchers("/api/cart/**", "/api/orders/**").authenticated()
+                // Gateway payment notification callback is public (server-to-server)
+                .requestMatchers(HttpMethod.POST, "/api/payments/notify").permitAll()
+                // All other payment endpoints require authentication
+                .requestMatchers("/api/payments/**").authenticated()
                 // Everything else requires authentication
                 .anyRequest().authenticated()
             )
@@ -77,11 +83,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // HEAD: localhost:5173 | developer: adds 127.0.0.1:5173 and localhost:3000
-        configuration.setAllowedOrigins(List.of(
+        configuration.setAllowedOrigins(java.util.stream.Stream.of(frontendUrl,
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:3000"
-        ));
+        ).distinct().toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

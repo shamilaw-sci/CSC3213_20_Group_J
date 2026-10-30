@@ -198,3 +198,34 @@ CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
+
+
+-- ----------------------------------------------------------------------------
+-- 6. PAYMENT SYSTEM MIGRATIONS (Phases 3-6)
+-- ----------------------------------------------------------------------------
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE addresses ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_reference VARCHAR(100) UNIQUE;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'LKR';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC(10, 2) NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS payments (
+    id                      BIGSERIAL PRIMARY KEY,
+    order_id                BIGINT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
+    gateway                 VARCHAR(50) NOT NULL,
+    internal_payment_id     VARCHAR(100) NOT NULL UNIQUE,
+    gateway_transaction_ref VARCHAR(200),
+    amount                  NUMERIC(10, 2) NOT NULL,
+    currency                VARCHAR(10) NOT NULL DEFAULT 'LKR',
+    payment_method          VARCHAR(50) NOT NULL,
+    status                  VARCHAR(50) NOT NULL,
+    gateway_raw_response    TEXT,
+    initiated_at            TIMESTAMP WITHOUT TIME ZONE,
+    completed_at            TIMESTAMP WITHOUT TIME ZONE,
+    created_at              TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_internal_payment_id ON payments(internal_payment_id);

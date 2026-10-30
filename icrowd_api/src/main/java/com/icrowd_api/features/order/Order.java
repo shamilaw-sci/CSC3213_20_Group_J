@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "checkout_key"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,6 +26,13 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "checkout_key")
+    private String checkoutKey;
+    @Builder.Default
+    private boolean stockAllocated = false;
+    private Long unavailableProductId;
+    private String unavailableProductName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -34,6 +41,10 @@ public class Order {
     @Column(nullable = false)
     private OrderStatus status;
 
+    // Human-readable reference e.g. ORD-20261028-00001
+    @Column(unique = true)
+    private String orderReference;
+
     // Shipping Details
     private String shippingFullName;
     private String shippingPhone;
@@ -41,7 +52,7 @@ public class Order {
     private String shippingAddress;
     private String shippingDistrict;
     
-    // Map Coordinates (optional for mock, but good to have)
+    // Map Coordinates
     private Double shippingLat;
     private Double shippingLng;
 
@@ -50,14 +61,25 @@ public class Order {
     private DeliveryType deliveryType;
 
     // Pricing
+    @Builder.Default
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal shippingCost;
+    private BigDecimal shippingCost = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal subTotal;
+    private BigDecimal subTotal = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal totalAmount;
+    private BigDecimal discount = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private String currency = "LKR";
 
     // Payment
     @Enumerated(EnumType.STRING)
@@ -68,11 +90,15 @@ public class Order {
     @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
-    private String receiptUrl; // For Bank Transfer
+    private String receiptUrl; // Kept for legacy bank transfer upload compatibility
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(updatable = false)
