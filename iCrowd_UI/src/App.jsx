@@ -14,6 +14,7 @@ import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminProducts from './features/admin/pages/AdminProducts.jsx';
 import AdminCategories from './features/admin/pages/AdminCategories.jsx';
 import AdminUsers from './features/admin/pages/AdminUsers.jsx';
+import AdminPromoCodes from './features/admin/pages/AdminPromoCodes.jsx';
 import AnalyticsPage from './features/analytics/pages/AnalyticsPage.jsx';
 import ProfilePage from './features/user/pages/ProfilePage.jsx';
 import ProtectedRoute from './features/auth/component/ProtectedRoute.jsx';
@@ -115,6 +116,7 @@ function App() {
               <Route path="products" element={<AdminProducts />} />
               <Route path="categories" element={<AdminCategories />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="promo-codes" element={<AdminPromoCodes />} />
             </Route>
 
             {/* Fallback */}

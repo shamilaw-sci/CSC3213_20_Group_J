@@ -1,6 +1,7 @@
 package com.icrowd_api.features.order;
 
 import com.icrowd_api.features.auth.User;
+import com.icrowd_api.features.promo.PromoCode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -91,6 +92,14 @@ public class Order {
     private PaymentStatus paymentStatus;
 
     private String receiptUrl; // Kept for legacy bank transfer upload compatibility
+
+    // Promo Code (optional — null when no code was applied)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promo_code_id")
+    private PromoCode appliedPromoCode;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal discountAmount;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

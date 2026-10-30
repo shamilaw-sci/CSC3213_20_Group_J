@@ -7,9 +7,12 @@ import com.icrowd_api.features.auth.dto.AddressDto;
 import com.icrowd_api.features.order.dto.*;
 import com.icrowd_api.features.product.Product;
 import com.icrowd_api.features.product.ProductRepository;
+import com.icrowd_api.features.promo.PromoCodeService;
+import com.icrowd_api.features.promo.PromoValidationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,6 +40,9 @@ public class OrderService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private PromoCodeService promoCodeService;
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(\\+?94|0)?[0-9]{9,10}$");
 
@@ -262,6 +268,13 @@ public class OrderService {
         }
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (StringUtils.hasText(request.getPromoCode())) {
+            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
+            discount = validation.getDiscountAmount();
+        }
+        order.setDiscountAmount(discount);
+
         BigDecimal shippingCost = request.getDeliveryType() == DeliveryType.FAST
                 ? new BigDecimal("500.00")
                 : new BigDecimal("200.00");
@@ -278,6 +291,10 @@ public class OrderService {
         }
         // Save order
         Order savedOrder = orderRepository.save(order);
+
+        if (StringUtils.hasText(request.getPromoCode()) && discount.signum() > 0) {
+            promoCodeService.applyCodeToOrder(request.getPromoCode(), user, savedOrder);
+        }
 
         // Generate clean human-readable reference: ORD-YYYYMMDD-ID
         String orderRef = "ORD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
@@ -385,6 +402,7 @@ public class OrderService {
     @Transactional
     public Order createOrder(String email, CheckoutRequest request) {
         CreateOrderRequest newReq = CreateOrderRequest.builder()
+                .promoCode(request.getPromoCode())
                 .shippingFullName(request.getShippingFullName())
                 .shippingPhone(request.getShippingPhone())
                 .shippingEmail(request.getShippingEmail())

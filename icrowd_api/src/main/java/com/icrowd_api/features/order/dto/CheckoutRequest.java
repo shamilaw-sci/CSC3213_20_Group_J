@@ -24,4 +24,7 @@ public class CheckoutRequest {
 
     // Cart Items
     private List<CheckoutItemDto> items;
+
+    // Promo Code (optional — null/empty when no code was applied)
+    private String promoCode;
 }

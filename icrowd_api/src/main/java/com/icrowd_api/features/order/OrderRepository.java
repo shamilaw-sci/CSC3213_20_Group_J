@@ -19,6 +19,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     java.util.Optional<Order> findByUserIdAndCheckoutKey(Long userId, String checkoutKey);
     List<Order> findByUserId(Long userId);
 
+    /**
+     * Used by PromoCodeService to determine if a customer is "new"
+     * (zero delivered/completed orders) for NEW_CUSTOMERS promo eligibility.
+     */
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'COMPLETED')")
+    long countCompletedOrdersByUserId(@Param("userId") Long userId);
+
     @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId")
     List<Long> findUserPurchasedCategoryIds(@Param("userId") Long userId);
 }

@@ -189,7 +189,45 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 -- ----------------------------------------------------------------------------
--- 5. PERFORMANCE INDEXES
+-- 5. PROMO CODES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS promo_codes (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    discount_type VARCHAR(20) NOT NULL,           -- PERCENTAGE | FIXED
+    discount_value NUMERIC(10, 2) NOT NULL,
+    max_discount_amount NUMERIC(10, 2),           -- cap for PERCENTAGE type
+    minimum_order_amount NUMERIC(10, 2),
+    start_date DATE,
+    expiry_date DATE,
+    total_usage_limit INT,                        -- null = unlimited
+    per_customer_limit INT,                       -- null = unlimited
+    customer_eligibility VARCHAR(30) NOT NULL DEFAULT 'ALL',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    usage_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS promo_eligible_emails (
+    promo_id BIGINT NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS promo_code_usages (
+    id BIGSERIAL PRIMARY KEY,
+    promo_id BIGINT NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
+    used_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Promo columns on orders (nullable so existing rows are unaffected)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code_id BIGINT REFERENCES promo_codes(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2);
+
+-- ----------------------------------------------------------------------------
+-- 6. PERFORMANCE INDEXES
 -- ----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_customers_user_id ON customers(user_id);
@@ -229,3 +267,6 @@ CREATE TABLE IF NOT EXISTS payments (
 
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_internal_payment_id ON payments(internal_payment_id);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
+CREATE INDEX IF NOT EXISTS idx_promo_usages_promo_id ON promo_code_usages(promo_id);
+CREATE INDEX IF NOT EXISTS idx_promo_usages_user_id ON promo_code_usages(user_id);

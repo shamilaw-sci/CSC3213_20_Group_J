@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../cart/hooks/CartContext';
-import { CreditCard, Banknote, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
-import { createOrder, initiatePayment, submitPayHereCheckout } from '../api/checkoutApi';
+import { CreditCard, Banknote, ShieldCheck, Tag, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { createOrder, initiatePayment, submitPayHereCheckout, validatePromoCode } from '../api/checkoutApi';
 
 const PaymentPage = () => {
   const { getCartTotal, removeFromCart } = useCart();
@@ -16,6 +16,11 @@ const PaymentPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
+  // Promo code state
+  const [promoInput, setPromoInput] = useState('');
+  const [promoStatus, setPromoStatus] = useState('idle'); // idle | checking | valid | invalid
+  const [promoData, setPromoData] = useState(null); // PromoValidationResponse
+
   useEffect(() => {
     if (!checkoutData) navigate('/checkout/shipping');
   }, [navigate, checkoutData]);
@@ -26,7 +31,8 @@ const PaymentPage = () => {
   const subTotal = checkoutData.subTotal != null ? Number(checkoutData.subTotal) : getCartTotal();
   const shippingCost = checkoutData.shippingCost != null ? Number(checkoutData.shippingCost) : (checkoutData.deliveryType === 'FAST' ? 500 : 200);
   const discount = checkoutData.discount != null ? Number(checkoutData.discount) : 0;
-  const total = checkoutData.total != null ? Number(checkoutData.total) : (subTotal - discount + shippingCost);
+  const discountAmount = Number(promoData?.discountAmount ?? 0);
+  const total = subTotal - (promoStatus === 'valid' ? discountAmount : discount) + shippingCost;
 
   // Requirement 13: Dynamic button label based on payment method
   const getButtonLabel = () => {
@@ -40,6 +46,36 @@ const PaymentPage = () => {
         return `Pay Rs. ${total.toFixed(2)}`;
     }
   };
+
+  // ── Promo code handlers ──────────────────────────────────────────────────────
+
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoStatus('checking');
+    setPromoData(null);
+    try {
+      const result = await validatePromoCode(code, subTotal);
+      if (result.valid) {
+        setPromoStatus('valid');
+        setPromoData(result);
+      } else {
+        setPromoStatus('invalid');
+        setPromoData(result);
+      }
+    } catch {
+      setPromoStatus('invalid');
+      setPromoData({ message: 'Could not validate promo code. Please try again.' });
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoInput('');
+    setPromoStatus('idle');
+    setPromoData(null);
+  };
+
+  // ── Checkout handler ─────────────────────────────────────────────────────────
 
   const handlePayment = async () => {
     // Requirement 14: Validate payment method selected
@@ -58,6 +94,7 @@ const PaymentPage = () => {
       localStorage.setItem('checkoutData', JSON.stringify({ ...checkoutData, checkoutKey }));
       const orderPayload = {
         checkoutKey,
+        promoCode: promoStatus === 'valid' ? promoInput.trim().toUpperCase() : null,
         shippingFullName: checkoutData.shippingFullName,
         shippingPhone: checkoutData.shippingPhone,
         shippingEmail: checkoutData.shippingEmail,
@@ -249,6 +286,57 @@ const PaymentPage = () => {
                 {paymentMethod === 'CARD' ? 'Credit/Debit Card' : 'Cash on Delivery'}
               </span>
             </div>
+            {promoStatus === 'valid' && discountAmount > 0 && (
+              <div className="flex justify-between text-sm font-medium text-green-600">
+                <span className="flex items-center gap-1">
+                  <Tag size={13} /> Promo ({promoData.promoCode})
+                </span>
+                <span>- Rs. {Number(discountAmount).toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Promo Code Input */}
+          <div className="mb-4">
+            {promoStatus !== 'valid' ? (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                  Promo Code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoInput}
+                    onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoStatus('idle'); setPromoData(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                    placeholder="Enter code"
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-black transition-colors"
+                  />
+                  <button
+                    onClick={handleApplyPromo}
+                    disabled={promoStatus === 'checking' || !promoInput.trim()}
+                    className="px-4 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-all disabled:bg-gray-300 flex items-center gap-1.5"
+                  >
+                    {promoStatus === 'checking' ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Apply
+                  </button>
+                </div>
+                {promoStatus === 'invalid' && promoData?.message && (
+                  <p className="text-xs text-red-500 mt-1.5">{promoData.message}</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle2 size={15} />
+                  <span className="text-sm font-semibold">{promoData.promoCode}</span>
+                  <span className="text-xs text-green-600">{promoData.message}</span>
+                </div>
+                <button onClick={handleRemovePromo} className="text-green-600 hover:text-red-500 transition-colors">
+                  <X size={15} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-end mb-8">

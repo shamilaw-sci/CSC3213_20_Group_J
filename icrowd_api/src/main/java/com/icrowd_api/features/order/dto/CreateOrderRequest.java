@@ -21,6 +21,7 @@ import java.util.List;
 public class CreateOrderRequest {
     @jakarta.validation.constraints.Size(max = 100)
     private String checkoutKey;
+    private String promoCode;
 
     @NotBlank(message = "Recipient full name is required")
     private String shippingFullName;

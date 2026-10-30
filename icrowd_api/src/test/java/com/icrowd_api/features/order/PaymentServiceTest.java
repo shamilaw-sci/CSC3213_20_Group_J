@@ -52,6 +52,19 @@ class PaymentServiceTest {
      "payhere_amount",p.getAmount().toPlainString(),"payhere_currency","LKR","status_code",status.equals("succeeded")?"2":"-2");
  }
  void success(Payment p) { service.processNotification(result(p,"succeeded")); }
+ @Autowired com.icrowd_api.features.promo.PromoCodeRepository promos;
+ @Test void mergedPromoDiscountReachesOrderAndPayment() {
+   String code="PROMO"+UUID.randomUUID().toString().replace("-","");
+   promos.save(com.icrowd_api.features.promo.PromoCode.builder().code(code)
+     .discountType(com.icrowd_api.features.promo.DiscountType.FIXED).discountValue(new BigDecimal("25.00")).build());
+   var req=request(PaymentMethod.CARD); req.setPromoCode(code);
+   Long id=orders.createNewOrder(email,req).getOrderId();
+   assertEquals(new BigDecimal("275.00"),orderRepository.findById(id).orElseThrow().getTotalAmount());
+   assertNotNull(orderRepository.findById(id).orElseThrow().getAppliedPromoCode());
+   assertEquals(new BigDecimal("275.00"),start(id).getAmount());
+   assertEquals(id,orders.createNewOrder(email,req).getOrderId());
+   assertEquals(1,promos.findByCodeIgnoreCase(code).orElseThrow().getUsageCount());
+ }
  @Test void pendingOrdersDoNotReserveStockAndDuplicateCreationReusesOrder() {
    var req=request(PaymentMethod.CARD);
    var first=orders.createNewOrder(email,req);

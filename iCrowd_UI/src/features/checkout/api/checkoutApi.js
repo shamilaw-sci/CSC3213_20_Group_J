@@ -81,3 +81,8 @@ export const submitPayHereCheckout = (session) => {
   document.body.appendChild(form);
   form.submit();
 };
+
+export const validatePromoCode = async (code, cartSubTotal) => {
+  const response = await apiClient.post('/promo/validate', { code, cartSubTotal });
+  return response.data;
+};
