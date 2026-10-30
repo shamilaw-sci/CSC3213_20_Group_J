@@ -9,13 +9,21 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Order o SET o.status = com.icrowd_api.features.order.OrderStatus.CANCELLED WHERE o.status = com.icrowd_api.features.order.OrderStatus.PENDING_PAYMENT AND o.createdAt < :cutoff AND NOT EXISTS (SELECT p.id FROM Payment p WHERE p.order = o)")
+    int expireUnstarted(@Param("cutoff") java.time.LocalDateTime cutoff);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    java.util.Optional<Order> findForUpdate(@Param("id") Long id);
+
+    java.util.Optional<Order> findByUserIdAndCheckoutKey(Long userId, String checkoutKey);
     List<Order> findByUserId(Long userId);
 
     /**
      * Used by PromoCodeService to determine if a customer is "new"
      * (zero delivered/completed orders) for NEW_CUSTOMERS promo eligibility.
      */
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('DELIVERED', 'PROCESSING', 'PENDING')")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'COMPLETED')")
     long countCompletedOrdersByUserId(@Param("userId") Long userId);
 
     @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId")

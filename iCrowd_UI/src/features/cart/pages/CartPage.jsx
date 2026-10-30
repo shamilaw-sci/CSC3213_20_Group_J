@@ -52,6 +52,7 @@ const CartPage = () => {
             <ShoppingBag size={48} className="text-gray-300" />
           </div>
           <h1 className="text-4xl font-bold text-black mb-4">Your cart is empty</h1>
+          {location.state?.checkoutMessage && <p role="status" className="mb-4 text-amber-800">{location.state.checkoutMessage}{location.state.orderStatusUrl && <Link className="block underline mt-2" to={location.state.orderStatusUrl}>Check refund status</Link>}</p>}
           <p className="text-gray-500 mb-8 max-w-md">
             Looks like you haven't added anything to your cart yet. Let's get you back to shopping.
           </p>
@@ -78,6 +79,7 @@ const CartPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
+      {location.state?.checkoutMessage && <p role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-amber-800">{location.state.checkoutMessage}</p>}
       
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">

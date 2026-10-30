@@ -203,6 +203,7 @@ public class PromoCodeService {
         PromoCode promo = promoCodeRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new PromoCodeNotFoundException(code));
 
+        order.setAppliedPromoCode(promo);
         PromoCodeUsage usage = PromoCodeUsage.builder()
                 .promoCode(promo)
                 .customer(user)
