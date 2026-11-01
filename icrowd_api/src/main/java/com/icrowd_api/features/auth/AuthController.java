@@ -1,5 +1,6 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.audit.AuditService;
 import com.icrowd_api.features.auth.dto.RegisterRequest;
 import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.auth.security.JwtUtil;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -35,6 +37,9 @@ public class AuthController {
     @Autowired
     private LoginAttemptService loginAttemptService;
 
+    @Autowired
+    private AuditService auditService;
+
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         String result = userService.registerUser(registerRequest);
@@ -50,7 +55,8 @@ public class AuthController {
         String password = loginData.get("password");
 
         if (loginAttemptService.isBlocked(email)) {
-            return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
+            return ResponseEntity.status(401).body(Map.of("message",
+                    "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
         }
 
         try {
@@ -73,10 +79,15 @@ public class AuthController {
             response.put("user", userProfile.orElse(null));
 
             return ResponseEntity.ok(response);
+        } catch (DisabledException e) {
+            // Account is DEACTIVATED (Spring Security disabled account)
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "Your account has been deactivated. Please contact support."));
         } catch (Exception e) {
             loginAttemptService.loginFailed(email);
             if (loginAttemptService.isBlocked(email)) {
-                return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
+                return ResponseEntity.status(401).body(Map.of("message",
+                        "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
             }
             return ResponseEntity.status(401).body(Map.of("message", "Invalid email or password!"));
         }
@@ -98,12 +109,32 @@ public class AuthController {
         return ResponseEntity.status(404).body(Map.of("message", "User not found"));
     }
 
-    // ADMIN only: promote a user to ADMIN role
+    /**
+     * ADMIN only: promote a user to ADMIN role.
+     * Requires reauthentication: include {"email": "target@email.com", "password": "adminpass"}.
+     */
     @PostMapping("/create-admin")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createAdmin(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
-        String result = userService.promoteToAdmin(email);
+    public ResponseEntity<?> createAdmin(
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+
+        String actorEmail = authentication.getName();
+        String targetEmail = body.get("email");
+        String confirmPassword = body.get("password");
+
+        // Reauthentication guard
+        if (confirmPassword == null || confirmPassword.isBlank()) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "Password confirmation is required for this operation"));
+        }
+        try {
+            userService.validateAdminPassword(actorEmail, confirmPassword);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+
+        String result = userService.promoteToAdmin(targetEmail, actorEmail);
         if (result.contains("successfully")) {
             return ResponseEntity.ok(Map.of("message", result));
         }

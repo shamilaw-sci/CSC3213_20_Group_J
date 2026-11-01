@@ -4,6 +4,7 @@ import com.icrowd_api.features.order.dto.CheckoutRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -44,8 +45,33 @@ public class OrderController {
         }
     }
 
+    /**
+     * Upload a payment receipt for an order.
+     * BOLA ownership check: only the order owner or an ADMIN may upload.
+     */
     @PostMapping("/{id}/receipt")
-    public ResponseEntity<?> uploadReceipt(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadReceipt(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        if (authentication == null) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", "Unauthorized"));
+        }
+
+        // Ownership / ADMIN bypass check
+        Order order = orderService.findById(id);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        boolean isAdmin = authentication.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean isOwner = order.getUser().getEmail().equals(authentication.getName());
+
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(403).body(java.util.Map.of("message", "Access denied: not your order"));
+        }
+
         try {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body("File is empty");
@@ -70,8 +96,6 @@ public class OrderController {
             Path filePath = uploadPath.resolve(fileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // Construct URL (assuming default port 8080 for backend)
-            // In a real app, you'd get the base URL from config or HttpServletRequest
             String fileUrl = "/uploads/" + fileName;
 
             // Update order

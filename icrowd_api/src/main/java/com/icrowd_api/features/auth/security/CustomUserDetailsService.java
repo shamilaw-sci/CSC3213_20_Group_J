@@ -30,15 +30,35 @@ public class CustomUserDetailsService implements UserDetailsService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + rawRole));
 
-        // Alias CUSTOMER and USER so both hasRole('CUSTOMER') and hasRole('USER') work
-        if ("CUSTOMER".equals(rawRole) || "USER".equals(rawRole)) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-            authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+        switch (rawRole) {
+            case "ADMIN" -> {
+                // Admin inherits inventory manager powers and all permissions
+                authorities.add(new SimpleGrantedAuthority("ROLE_INVENTORY_MANAGER"));
+                authorities.add(new SimpleGrantedAuthority("PERM_ACCOUNTS_MANAGE"));
+                authorities.add(new SimpleGrantedAuthority("PERM_INVENTORY_MANAGE"));
+                authorities.add(new SimpleGrantedAuthority("PERM_ANALYTICS_VIEW"));
+            }
+            case "INVENTORY_MANAGER" -> {
+                // Inventory managers can only manage products/categories/stock
+                authorities.add(new SimpleGrantedAuthority("PERM_INVENTORY_MANAGE"));
+            }
+            default -> {
+                // CUSTOMER / USER — alias both so hasRole('CUSTOMER') and hasRole('USER') both work
+                authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+            }
         }
+
+        // Determine if account is enabled — only ACTIVE accounts can authenticate
+        boolean enabled = "ACTIVE".equalsIgnoreCase(user.getAccountStatus());
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
+                enabled,          // enabled
+                true,             // accountNonExpired
+                true,             // credentialsNonExpired
+                true,             // accountNonLocked (lockout handled by LoginAttemptService)
                 authorities
         );
     }

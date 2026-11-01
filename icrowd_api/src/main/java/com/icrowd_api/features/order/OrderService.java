@@ -120,4 +120,9 @@ public class OrderService {
         order.setReceiptUrl(receiptUrl);
         orderRepository.save(order);
     }
+
+    @Transactional(readOnly = true)
+    public Order findById(Long orderId) {
+        return orderRepository.findById(orderId).orElse(null);
+    }
 }

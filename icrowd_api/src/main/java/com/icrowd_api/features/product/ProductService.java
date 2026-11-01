@@ -1,5 +1,6 @@
 package com.icrowd_api.features.product;
 
+import com.icrowd_api.features.audit.AuditService;
 import com.icrowd_api.features.category.Category;
 import com.icrowd_api.features.category.CategoryRepository;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -20,10 +22,14 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final AuditService auditService;
 
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public ProductService(ProductRepository productRepository,
+                          CategoryRepository categoryRepository,
+                          AuditService auditService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.auditService = auditService;
     }
 
     // ── Customer-facing ────────────────────────────────────────────────────────
@@ -127,7 +133,7 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
     }
 
-    public Product createProduct(ProductRequest request) {
+    public Product createProduct(ProductRequest request, String actorEmail) {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + request.categoryId()));
 
@@ -143,10 +149,20 @@ public class ProductService {
                 .isActive(request.isActive() != null ? request.isActive() : true)
                 .build();
 
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+        auditService.log(actorEmail, "PRODUCT_CREATED", "PRODUCT", saved.getId(),
+                "Created product '" + saved.getName() + "' SKU=" + saved.getSku()
+                        + " price=" + saved.getPrice() + " stock=" + saved.getAvailableStock());
+        return saved;
     }
 
-    public Product updateProduct(Long id, ProductRequest request) {
+    /** @deprecated Use {@link #createProduct(ProductRequest, String)} with actorEmail. */
+    @Deprecated
+    public Product createProduct(ProductRequest request) {
+        return createProduct(request, "SYSTEM");
+    }
+
+    public Product updateProduct(Long id, ProductRequest request, String actorEmail) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -157,14 +173,35 @@ public class ProductService {
         }
         if (request.name() != null) product.setName(request.name());
         if (request.description() != null) product.setDescription(request.description());
-        if (request.price() != null) product.setPrice(request.price());
-        if (request.availableStock() != null) product.setAvailableStock(request.availableStock());
+
+        // Audit price change
+        if (request.price() != null && !request.price().equals(product.getPrice())) {
+            BigDecimal oldPrice = product.getPrice();
+            product.setPrice(request.price());
+            auditService.log(actorEmail, "PRICE_CHANGE", "PRODUCT", product.getId(),
+                    "Price changed for '" + product.getName() + "': " + oldPrice + " -> " + request.price());
+        }
+
+        // Audit stock adjustment
+        if (request.availableStock() != null && !request.availableStock().equals(product.getAvailableStock())) {
+            int oldStock = product.getAvailableStock();
+            product.setAvailableStock(request.availableStock());
+            auditService.log(actorEmail, "STOCK_ADJUSTMENT", "PRODUCT", product.getId(),
+                    "Stock adjusted for '" + product.getName() + "': " + oldStock + " -> " + request.availableStock());
+        }
+
         if (request.imageUrls() != null) product.setImageUrls(request.imageUrls());
         if (request.tags() != null) product.setTags(request.tags());
         if (request.isActive() != null) product.setIsActive(request.isActive());
         if (request.sku() != null) product.setSku(request.sku());
 
         return productRepository.save(product);
+    }
+
+    /** @deprecated Use {@link #updateProduct(Long, ProductRequest, String)} with actorEmail. */
+    @Deprecated
+    public Product updateProduct(Long id, ProductRequest request) {
+        return updateProduct(id, request, "SYSTEM");
     }
 
     public void softDeleteProduct(Long id) {

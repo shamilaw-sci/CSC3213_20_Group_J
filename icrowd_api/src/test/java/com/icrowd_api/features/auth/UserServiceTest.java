@@ -38,6 +38,9 @@ public class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private com.icrowd_api.features.audit.AuditService auditService;
+
     @InjectMocks
     private UserService userService;
 

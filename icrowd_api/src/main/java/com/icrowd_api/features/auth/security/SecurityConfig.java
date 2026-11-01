@@ -44,17 +44,28 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
                 // Public review reads
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
-                // Admin-only write operations on products
-                .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/products/admin/**").hasRole("ADMIN")
-                // Admin-only write operations on categories
-                .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
-                // All /api/admin/** and /api/analytics/** require ADMIN role
+
+                // ── Inventory Management (ADMIN or INVENTORY_MANAGER) ──────────────
+                // Product write operations
+                .requestMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/products/admin/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                // Category write operations
+                .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                // Dashboard is available to both admin and inventory manager
+                .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+
+                // ── Account Administration (ADMIN only) ───────────────────────────
+                // User management and audit logs are strictly admin-only
+                .requestMatchers("/api/admin/users/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/audit-logs/**").hasRole("ADMIN")
+                // All other /api/admin/** and /api/analytics/** require ADMIN role
                 .requestMatchers("/api/admin/**", "/api/analytics/**").hasRole("ADMIN")
+
+                // ── Authenticated users ───────────────────────────────────────────
                 // Auth/me and create-admin require authentication
                 .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
                 // User profile and address endpoints require authentication

@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -53,7 +54,7 @@ public class ProductController {
     // ── Admin CRUD ─────────────────────────────────────────────────────────────
 
     @GetMapping("/admin/all")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<Page<Product>> getAllProductsForAdmin(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -61,27 +62,27 @@ public class ProductController {
     }
 
     @GetMapping("/admin/stats")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<Map<String, Long>> getDashboardStats() {
         return ResponseEntity.ok(productService.getDashboardStats());
     }
 
     @GetMapping("/admin/low-stock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<List<Product>> getLowStockProducts(
             @RequestParam(defaultValue = "5") int threshold) {
         return ResponseEntity.ok(productService.getLowStockProducts(threshold));
     }
 
     @GetMapping("/admin/recent")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<List<Product>> getRecentProducts(
             @RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(productService.getRecentProducts(limit));
     }
 
     @GetMapping("/admin/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<Product> getProductByIdForAdmin(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(productService.getProductByIdForAdmin(id));
@@ -91,10 +92,11 @@ public class ProductController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createProduct(@RequestBody ProductRequest request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
+    public ResponseEntity<?> createProduct(@RequestBody ProductRequest request, Authentication authentication) {
         try {
-            Product created = productService.createProduct(request);
+            String actorEmail = authentication != null ? authentication.getName() : "SYSTEM";
+            Product created = productService.createProduct(request, actorEmail);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -102,10 +104,13 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
+    public ResponseEntity<?> updateProduct(@PathVariable Long id,
+                                           @RequestBody ProductRequest request,
+                                           Authentication authentication) {
         try {
-            Product updated = productService.updateProduct(id, request);
+            String actorEmail = authentication != null ? authentication.getName() : "SYSTEM";
+            Product updated = productService.updateProduct(id, request, actorEmail);
             return ResponseEntity.ok(updated);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -113,7 +118,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         try {
             productService.softDeleteProduct(id);

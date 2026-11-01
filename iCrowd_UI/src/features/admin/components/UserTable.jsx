@@ -10,9 +10,66 @@ const RoleBadge = ({ role }) => (
     </span>
 );
 
-const UserTable = ({ users, onPromote, onDemote, onDelete, loading }) => {
+const StatusBadge = ({ status }) => (
+    <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${
+        status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+        status === 'DEACTIVATED' ? 'bg-red-100 text-red-600' :
+        'bg-yellow-100 text-yellow-700'
+    }`}>
+        {status || 'ACTIVE'}
+    </span>
+);
+
+/** Modal that prompts for admin password before promoting a user. */
+const PromoteConfirmModal = ({ isOpen, target, onConfirm, onCancel }) => {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleSubmit = () => {
+        if (!password.trim()) { setError('Password is required'); return; }
+        onConfirm(password);
+        setPassword('');
+        setError('');
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+                <h3 className="text-base font-bold text-gray-900">Confirm Promotion</h3>
+                <p className="text-sm text-gray-500">
+                    You are about to grant admin access to <span className="font-semibold">{target?.firstName} {target?.lastName}</span> ({target?.email}).
+                    Enter your password to confirm.
+                </p>
+                <input
+                    type="password"
+                    placeholder="Your admin password"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError(''); }}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    autoFocus
+                />
+                {error && <p className="text-xs text-red-500">{error}</p>}
+                <div className="flex gap-2 justify-end">
+                    <button onClick={() => { onCancel(); setPassword(''); setError(''); }}
+                        className="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button onClick={handleSubmit}
+                        className="px-4 py-2 text-sm font-semibold rounded-xl bg-gray-900 text-white hover:bg-gray-700">
+                        Promote
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const UserTable = ({ users, onPromote, onDemote, onDelete, onReactivate, loading }) => {
     const { user: currentUser } = useContext(AuthContext);
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [promoteTarget, setPromoteTarget] = useState(null);
 
     if (loading) {
         return (
@@ -29,6 +86,7 @@ const UserTable = ({ users, onPromote, onDemote, onDelete, loading }) => {
     }
 
     const deleteTarget = users.find(u => u.id === confirmDelete);
+    const isDeactivated = (u) => u.accountStatus === 'DEACTIVATED';
 
     return (
         <>
@@ -39,14 +97,18 @@ const UserTable = ({ users, onPromote, onDemote, onDelete, loading }) => {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-50">
                         {users.map(u => {
                             const isSelf = u.email === currentUser?.email;
+                            const deactivated = isDeactivated(u);
                             return (
-                                <tr key={u.id} className={`hover:bg-gray-50/70 transition-colors ${isSelf ? 'bg-blue-50/30' : ''}`}>
+                                <tr key={u.id} className={`hover:bg-gray-50/70 transition-colors ${
+                                    isSelf ? 'bg-blue-50/30' : deactivated ? 'bg-gray-50/60 opacity-60' : ''
+                                }`}>
                                     <td className="px-4 py-3.5">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center shrink-0">
@@ -65,36 +127,50 @@ const UserTable = ({ users, onPromote, onDemote, onDelete, loading }) => {
                                     </td>
                                     <td className="px-4 py-3.5 text-gray-600">{u.email}</td>
                                     <td className="px-4 py-3.5 text-center">
-                                        <RoleBadge role={u.role || 'USER'} />
+                                        <RoleBadge role={u.role || 'CUSTOMER'} />
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center">
+                                        <StatusBadge status={u.accountStatus} />
                                     </td>
                                     <td className="px-4 py-3.5">
                                         <div className="flex items-center justify-center gap-2">
-                                            {!isSelf && u.role !== 'ADMIN' && (
+                                            {/* Reactivate deactivated user */}
+                                            {!isSelf && deactivated && (
                                                 <button
-                                                    onClick={() => onPromote(u.id)}
+                                                    onClick={() => onReactivate(u.id)}
+                                                    title="Reactivate user"
+                                                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-500 hover:text-white transition-all"
+                                                >
+                                                    ↺ Reactivate
+                                                </button>
+                                            )}
+                                            {/* Active user actions */}
+                                            {!isSelf && !deactivated && u.role !== 'ADMIN' && (
+                                                <button
+                                                    onClick={() => setPromoteTarget(u)}
                                                     title="Promote to Admin"
                                                     className="px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-900 hover:text-white transition-all"
                                                 >
                                                     ↑ Promote
                                                 </button>
                                             )}
-                                            {!isSelf && u.role === 'ADMIN' && (
+                                            {!isSelf && !deactivated && u.role === 'ADMIN' && (
                                                 <button
                                                     onClick={() => onDemote(u.id)}
-                                                    title="Demote to User"
+                                                    title="Demote to Customer"
                                                     className="px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-500 hover:text-white transition-all"
                                                 >
                                                     ↓ Demote
                                                 </button>
                                             )}
-                                            {!isSelf && (
+                                            {!isSelf && !deactivated && (
                                                 <button
                                                     onClick={() => setConfirmDelete(u.id)}
-                                                    title="Delete user"
+                                                    title="Deactivate user"
                                                     className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                                     </svg>
                                                 </button>
                                             )}
@@ -107,13 +183,22 @@ const UserTable = ({ users, onPromote, onDemote, onDelete, loading }) => {
                 </table>
             </div>
 
+            {/* Deactivate confirmation modal */}
             <ConfirmModal
                 isOpen={!!confirmDelete}
-                title="Delete User?"
-                message={`This will permanently delete ${deleteTarget?.firstName} ${deleteTarget?.lastName} (${deleteTarget?.email}). This action cannot be undone.`}
-                confirmLabel="Delete User"
+                title="Deactivate User?"
+                message={`This will deactivate ${deleteTarget?.firstName} ${deleteTarget?.lastName} (${deleteTarget?.email}). Their order history will be preserved. You can reactivate them later.`}
+                confirmLabel="Deactivate"
                 onConfirm={() => { onDelete(confirmDelete); setConfirmDelete(null); }}
                 onCancel={() => setConfirmDelete(null)}
+            />
+
+            {/* Promote reauthentication modal */}
+            <PromoteConfirmModal
+                isOpen={!!promoteTarget}
+                target={promoteTarget}
+                onConfirm={(password) => { onPromote(promoteTarget.id, password); setPromoteTarget(null); }}
+                onCancel={() => setPromoteTarget(null)}
             />
         </>
     );
