@@ -1,19 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../hooks/CartContext.jsx';
 import CartItem from '../components/CartItem.jsx';
 import OrderSummary from '../components/OrderSummary.jsx';
-import ProductGrid from '../../products/components/ProductGrid.jsx';
-import { useProducts } from '../../products/hooks/useProducts.js';
+import ProductSlider from '../../products/components/ProductSlider.jsx';
+import { fetchCartSuggestions } from '../../products/api/recommendationApi.js';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag, AlertTriangle } from 'lucide-react';
 
 const CartPage = () => {
   const { cart, updateQuantity, removeFromCart, getCartTotal, getItemCount } = useCart();
-  const { products, loading } = useProducts(); 
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const location = useLocation();
-
-  const suggestedProducts = products.slice(0, 4);
   const navigate = useNavigate();
+
+  // Extract cart product IDs
+  const cartProductIds = cart.map((i) => i.product.id);
+  const cartIdsKey = cartProductIds.sort().join(',');
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingSuggestions(true);
+
+    fetchCartSuggestions(cartProductIds, 8)
+      .then((data) => {
+        if (isMounted) setSuggestions(data || []);
+      })
+      .catch((err) => {
+        console.error("Error fetching cart suggestions:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingSuggestions(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [cartIdsKey]);
 
   // Find if there's a specific product that failed during checkout
   const outOfStockProductId = location.state?.outOfStockProductId;
@@ -25,20 +46,32 @@ const CartPage = () => {
 
   if (cart.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-20 min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-          <ShoppingBag size={48} className="text-gray-300" />
+      <div className="max-w-7xl mx-auto px-4 py-16">
+        <div className="min-h-[40vh] flex flex-col items-center justify-center text-center">
+          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+            <ShoppingBag size={48} className="text-gray-300" />
+          </div>
+          <h1 className="text-4xl font-bold text-black mb-4">Your cart is empty</h1>
+          <p className="text-gray-500 mb-8 max-w-md">
+            Looks like you haven't added anything to your cart yet. Let's get you back to shopping.
+          </p>
+          <Link 
+            to="/search" 
+            className="bg-black text-white px-8 py-4 rounded-full font-bold hover:bg-gray-800 transition-colors shadow-lg shadow-black/20"
+          >
+            Explore All Products
+          </Link>
         </div>
-        <h1 className="text-4xl font-bold text-black mb-4">Your cart is empty</h1>
-        <p className="text-gray-500 mb-8 max-w-md text-center">
-          Looks like you haven't added anything to your cart yet. Let's get you back to shopping.
-        </p>
-        <Link 
-          to="/search" 
-          className="bg-black text-white px-8 py-4 rounded-full font-bold hover:bg-gray-800 transition-colors shadow-lg shadow-black/20"
-        >
-          Continue Shopping
-        </Link>
+
+        {/* Suggestion Section (even when cart is empty) */}
+        <div className="border-t border-gray-200 mt-12 pt-8">
+          <ProductSlider 
+            products={suggestions}
+            loading={loadingSuggestions}
+            title="Products You May Like"
+            subtitle="Trending essentials and popular recommendations."
+          />
+        </div>
       </div>
     );
   }
@@ -106,12 +139,12 @@ const CartPage = () => {
       </div>
 
       {/* Products You May Like */}
-      <div className="border-t border-gray-200 pt-16">
-        <ProductGrid 
-          products={suggestedProducts}
-          loading={loading}
+      <div className="border-t border-gray-200 pt-8">
+        <ProductSlider 
+          products={suggestions}
+          loading={loadingSuggestions}
           title="Products You May Like"
-          subtitle="Complete your loadout with these essentials."
+          subtitle="Complete your loadout with these matching recommendations."
         />
       </div>
 

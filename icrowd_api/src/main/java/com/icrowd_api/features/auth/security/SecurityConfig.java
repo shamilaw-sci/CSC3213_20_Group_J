@@ -39,7 +39,7 @@ public class SecurityConfig {
                 // Public AI Chatbot endpoints
                 .requestMatchers("/api/ai/**").permitAll()
                 // Public product read endpoints (customer store)
-                .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions", "/api/products/recommendations", "/api/products/featured", "/api/products/latest", "/api/products/*/similar", "/api/products/cart-suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
                 // Public review reads
