@@ -44,6 +44,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
                 // Public review reads
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
+                // Public promo availability check
+                .requestMatchers(HttpMethod.GET, "/api/promo/available").permitAll()
 
                 // ── Inventory Management (ADMIN or INVENTORY_MANAGER) ──────────────
                 // Product write operations

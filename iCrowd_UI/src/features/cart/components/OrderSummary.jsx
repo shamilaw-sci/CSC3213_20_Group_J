@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Tag } from 'lucide-react';
 
 const OrderSummary = ({ total, itemCount, onCheckout, disabled = false }) => {
   return (
@@ -15,20 +15,9 @@ const OrderSummary = ({ total, itemCount, onCheckout, disabled = false }) => {
           <span>Shipping</span>
           <span className="text-green-600 font-medium">Free</span>
         </div>
-        
-        {/* Placeholder for promotions */}
-        <div className="pt-4 border-t border-gray-200">
-          <p className="text-sm text-gray-500 mb-2">Gift card or discount code</p>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Enter code" 
-              className="flex-grow bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-black transition-colors"
-            />
-            <button className="bg-gray-200 text-black px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-300 transition-colors">
-              Apply
-            </button>
-          </div>
+        <div className="pt-3 border-t border-gray-200 flex items-center gap-2 text-xs text-gray-500">
+          <Tag size={13} className="text-gray-400" />
+          <span>Promo codes and discounts can be applied at checkout</span>
         </div>
       </div>
 

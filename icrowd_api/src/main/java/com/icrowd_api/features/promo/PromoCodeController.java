@@ -74,7 +74,13 @@ public class PromoCodeController {
         }
     }
 
-    // ── Customer endpoint (any authenticated user) ────────────────────────────
+    // ── Customer endpoints ────────────────────────────────────────────────────
+
+    @GetMapping("/available")
+    public ResponseEntity<List<PromoCodeResponse>> getAvailablePromotions(Authentication authentication) {
+        String email = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(promoCodeService.getAvailablePromotions(email));
+    }
 
     @PostMapping("/validate")
     public ResponseEntity<?> validate(

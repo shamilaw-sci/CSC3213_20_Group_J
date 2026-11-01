@@ -21,3 +21,8 @@ export const validatePromoCode = async (code, cartSubTotal) => {
   const response = await apiClient.post('/promo/validate', { code, cartSubTotal });
   return response.data;
 };
+
+export const getAvailablePromoCodes = async () => {
+  const response = await apiClient.get('/promo/available');
+  return response.data;
+};
