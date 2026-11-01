@@ -46,7 +46,7 @@ public class Order {
     private Double shippingLat;
     private Double shippingLng;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = DeliveryTypeConverter.class)
     @Column(nullable = false)
     private DeliveryType deliveryType;
 
@@ -61,11 +61,11 @@ public class Order {
     private BigDecimal totalAmount;
 
     // Payment
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = PaymentMethodConverter.class)
     @Column(nullable = false)
     private PaymentMethod paymentMethod;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = PaymentStatusConverter.class)
     @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
