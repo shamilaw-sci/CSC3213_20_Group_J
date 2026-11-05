@@ -1,156 +1,50 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useReviews } from '../hooks/useReviews';
-import { Star, MessageSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
-const ReviewSection = ({ productId }) => {
-  const { reviews, loading, error, submitReview, isAuthenticated, loadMoreReviews, hasMore } = useReviews(productId);
-  const navigate = useNavigate();
-
+export default function ReviewSection({ productId, onChanged }) {
+  const { reviews, loading, error, submitReview, deleteReview, user, loadMoreReviews, retry, hasMore } = useReviews(productId);
+  const [editing, setEditing] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitError(null);
-    try {
-      await submitReview(rating, comment);
-      setComment('');
-      setRating(5);
-      setShowForm(false);
-    } catch (err) {
-      setSubmitError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const reset = () => { setEditing(null); setRating(5); setComment(''); setShowForm(false); };
+  const submit = async (event) => {
+    event.preventDefault(); setBusy(true); setMessage('');
+    try { await submitReview(rating, comment.trim(), editing); reset(); setMessage('Review saved.'); await onChanged?.(); }
+    catch (err) { setMessage(err.message); } finally { setBusy(false); }
   };
-
-  const renderStars = (count) => {
-    return [...Array(5)].map((_, i) => (
-      <Star key={i} className={`w-5 h-5 ${i < count ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
-    ));
+  const remove = async (id) => {
+    if (!window.confirm('Delete this review?')) return;
+    setBusy(true); setMessage('');
+    try { await deleteReview(id); reset(); setMessage('Review deleted.'); await onChanged?.(); }
+    catch (err) { setMessage(err.message); } finally { setBusy(false); }
   };
-
-  if (loading) return <div className="text-center p-8">Loading reviews...</div>;
-  if (error) return <div className="text-red-500 p-8">{error}</div>;
-
-  return (
-    <div className="mb-20 bg-[#F6F6F6] p-8 md:p-12 rounded-[32px]">
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-3">
-            <MessageSquare className="w-8 h-8 text-black" />
-            <h3 className="text-3xl font-bold text-black">Customer Reviews</h3>
-        </div>
-        {!showForm && (
-            <button 
-                onClick={() => isAuthenticated ? setShowForm(true) : navigate('/login')}
-                className="bg-black text-white px-6 py-3 rounded-full font-bold hover:bg-gray-800 transition-colors shadow-md"
-            >
-                Write a Review
-            </button>
-        )}
-      </div>
-
-      {/* Review Submission Form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl mb-10 shadow-sm border border-gray-200">
-          <h4 className="font-bold text-lg mb-4">Share your thoughts</h4>
-          
-          <div className="flex items-center gap-2 mb-4">
-            <span className="font-medium text-gray-700 mr-2">Rating:</span>
-            {[1, 2, 3, 4, 5].map((num) => (
-              <button 
-                key={num} 
-                type="button" 
-                onClick={() => setRating(num)}
-                className="focus:outline-none transition-transform hover:scale-110"
-              >
-                <Star className={`w-8 h-8 ${rating >= num ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-              </button>
-            ))}
-          </div>
-
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="What did you like or dislike about this product?"
-            className="w-full p-4 border border-gray-200 rounded-xl mb-4 focus:ring-2 focus:ring-black outline-none resize-none"
-            rows="4"
-          />
-
-          {submitError && <div className="text-red-500 mb-4 font-medium">{submitError}</div>}
-
-          <div className="flex gap-3 justify-end">
-            <button 
-                type="button" 
-                onClick={() => setShowForm(false)}
-                className="px-6 py-3 font-bold text-gray-500 hover:text-black transition-colors"
-            >
-                Cancel
-            </button>
-            <button 
-                type="submit" 
-                disabled={isSubmitting || comment.trim().length < 5}
-                className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 disabled:bg-gray-300 transition-colors shadow-md"
-            >
-                {isSubmitting ? 'Posting...' : 'Post Review'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Reviews List */}
-      <div className="space-y-6">
-        {reviews.length === 0 ? (
-          <p className="text-gray-500 font-medium italic text-lg py-8 text-center bg-white rounded-2xl border border-gray-100">
-            No reviews yet. Be the first to review this product!
-          </p>
-        ) : (
-          reviews.map((review) => (
-            <div key={review.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-shadow hover:shadow-md">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                    <h5 className="font-black text-xl text-black mb-1">{review.title}</h5>
-                    <div className="flex gap-1 mb-2">
-                        {renderStars(review.rating)}
-                    </div>
-                </div>
-                <span className="text-sm text-gray-400 font-medium">
-                  {new Date(review.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                </span>
-              </div>
-              
-              <p className="text-gray-700 leading-relaxed mb-4">{review.comment}</p>
-              
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500 uppercase">
-                    {review.authorName.charAt(0)}
-                </div>
-                <span className="text-sm font-bold text-gray-600">By {review.authorName}</span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Pagination: Load More */}
-      {hasMore && reviews.length > 0 && (
-        <div className="mt-8 flex justify-center">
-          <button
-            onClick={loadMoreReviews}
-            disabled={loading}
-            className="px-8 py-3 bg-white border border-gray-200 font-bold text-gray-700 rounded-full shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Load More Reviews'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default ReviewSection;
+  return <section id="reviews" className="mb-12 bg-[#F6F6F6] p-6 md:p-10 rounded-[32px]">
+    <h2 className="text-2xl font-bold mb-3">Customer Reviews</h2>
+    <p className="text-gray-600 mb-4">One review per product, after your order is confirmed. You can edit your review later.</p>
+    {user ? <button disabled={busy || loading} className="rounded-full bg-black text-white px-5 py-2 mb-4" onClick={() => { reset(); setShowForm(true); }}>Write a Review</button> : <Link className="underline" to="/login">Sign in to write a review</Link>}
+    {showForm && <form onSubmit={submit} className="bg-white p-5 rounded-xl mb-5 space-y-3">
+      <h3 className="font-bold">{editing ? 'Edit review' : 'Write a review'}</h3>
+      <label className="block">Rating <select aria-label="Rating" className="border rounded p-2 ml-2" value={rating} onChange={e => setRating(Number(e.target.value))}>{[5,4,3,2,1].map(n => <option key={n} value={n}>{n} {n === 1 ? 'star' : 'stars'}</option>)}</select></label>
+      <label className="block">Your review<textarea aria-label="Your review" className="block border rounded p-3 w-full mt-1" rows={4} minLength={5} maxLength={1000} required value={comment} onChange={e => setComment(e.target.value)} /></label>
+      <p className="text-sm text-gray-500">{comment.length}/1000 characters</p>
+      <button disabled={busy || loading || comment.trim().length < 5} className="bg-black text-white rounded px-4 py-2 disabled:opacity-50">{busy ? 'Saving...' : 'Save review'}</button>
+      <button type="button" disabled={busy || loading} className="ml-4" onClick={reset}>Cancel</button>
+    </form>}
+    {message && <p role="status" className="my-3">{message}</p>}
+    {error && <p role="alert" className="text-red-700 my-3">{error} <button onClick={retry} className="underline">Retry</button></p>}
+    {!loading && !error && reviews.length === 0 && <p className="py-4 text-gray-600">No reviews yet. Be the first to review this product!</p>}
+    <div className="space-y-4">{reviews.map(review => <article key={review.id} className="bg-white p-5 rounded-xl">
+      <p aria-label={review.rating + ' out of 5 stars'} className="text-amber-600 text-xl">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</p>
+      <p className="font-semibold">{review.authorName} <span className="text-gray-500 text-sm font-normal">· {new Date(review.createdAt).toLocaleDateString()}</span></p>
+      <p className="whitespace-pre-wrap break-words my-3">{review.comment}</p>
+      {user && String(user.id) === String(review.userId) && <button disabled={busy || loading} className="underline mr-4" onClick={() => { setEditing(review.id); setRating(review.rating); setComment(review.comment); setShowForm(true); }}>Edit review</button>}
+      {user && (String(user.id) === String(review.userId) || user.role === 'ADMIN') && <button disabled={busy || loading} className="text-red-700 underline" onClick={() => remove(review.id)}>Delete review</button>}
+    </article>)}</div>
+    {loading && <p role="status" className="py-4">Loading reviews...</p>}
+    {hasMore && <button disabled={loading || busy} onClick={loadMoreReviews} className="mt-5 underline">Load More Reviews</button>}
+  </section>;
+}

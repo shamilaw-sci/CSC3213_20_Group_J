@@ -19,6 +19,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("message", errorMessage));
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<?> handleStatus(org.springframework.web.server.ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message", ex.getReason() == null ? "Request failed" : ex.getReason()));
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneralExceptions(Exception ex) {
         return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred"));
