@@ -1,58 +1,46 @@
-import { useState, useEffect, useCallback } from 'react';
-import { fetchProductReviews, submitProductReview } from '../api/reviewApi';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiClient } from '../../../lib/axios';
 import { useAuth } from '../../auth/context/AuthContext';
 
 export const useReviews = (productId) => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [page, setPage] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
-    const { user } = useAuth(); // Need to check if user is logged in to allow submitting
-
-    const loadReviews = useCallback(async (pageNum) => {
+    const [hasMore, setHasMore] = useState(false);
+    const page = useRef(0);
+    const busy = useRef(false);
+    const generation = useRef(0);
+    const { user } = useAuth();
+    const load = useCallback(async (nextPage = 0) => {
+        const current = generation.current;
+        if (busy.current) return;
+        busy.current = true; setLoading(true); setError(null);
         try {
-            if (pageNum === 0) setLoading(true);
-            const data = await fetchProductReviews(productId, pageNum, 10);
-            
-            setReviews(prev => pageNum === 0 ? data.content : [...prev, ...data.content]);
-            setHasMore(!data.last); // Spring Data JPA Page object has a 'last' boolean
-            setError(null);
+            const { data } = await apiClient.get('/products/' + productId + '/reviews', { params: { page: nextPage, size: 10 } });
+            if (current !== generation.current) return;
+            setReviews(prev => nextPage === 0 ? data.content : [...prev, ...data.content.filter(r => !prev.some(p => p.id === r.id))]);
+            page.current = nextPage; setHasMore(!data.last);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to load reviews');
+            if (current === generation.current) setError(err.response?.data?.message || 'Failed to load reviews. Please retry.');
         } finally {
-            setLoading(false);
+            if (current === generation.current) { busy.current = false; setLoading(false); }
         }
     }, [productId]);
-
     useEffect(() => {
-        if (productId) {
-            setPage(0);
-            loadReviews(0);
-        }
-    }, [productId, loadReviews]);
-
-    const loadMoreReviews = () => {
-        if (!hasMore || loading) return;
-        const nextPage = page + 1;
-        setPage(nextPage);
-        loadReviews(nextPage);
-    };
-
-    const submitReview = async (rating, comment) => {
-        if (!user) {
-            throw new Error("You must be logged in to leave a review.");
-        }
-        
+        generation.current++; const effectGeneration = generation.current; busy.current = false; page.current = 0; setReviews([]); setHasMore(false);
+        load(0);
+        return () => { generation.current = effectGeneration + 1; busy.current = false; };
+    }, [load]);
+    const submitReview = async (rating, comment, reviewId) => {
+        const url = '/products/' + productId + '/reviews';
         try {
-            const data = await submitProductReview(productId, rating, comment);
-            // Instantly add the new review to the top of the list
-            setReviews(prev => [data, ...prev]);
-            return data;
-        } catch (err) {
-            throw new Error(err.response?.data?.message || 'Failed to submit review');
-        }
+            const { data } = reviewId ? await apiClient.put(url + '/' + reviewId, { rating, comment }) : await apiClient.post(url, { rating, comment });
+            await load(0); return data;
+        } catch (err) { throw new Error(err.response?.data?.message || 'Failed to save review'); }
     };
-
-    return { reviews, loading, error, submitReview, isAuthenticated: !!user, loadMoreReviews, hasMore };
+    const deleteReview = async (reviewId) => {
+        try { await apiClient.delete('/products/' + productId + '/reviews/' + reviewId); await load(0); }
+        catch (err) { throw new Error(err.response?.data?.message || 'Failed to delete review'); }
+    };
+    return { reviews, loading, error, submitReview, deleteReview, user, isAuthenticated: !!user, loadMoreReviews: () => load(page.current + 1), retry: () => load(page.current), hasMore };
 };

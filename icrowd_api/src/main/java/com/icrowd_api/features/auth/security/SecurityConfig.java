@@ -44,6 +44,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions", "/api/products/recommendations", "/api/products/featured", "/api/products/latest", "/api/products/*/similar", "/api/products/cart-suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
+                // Feedback rules must precede admin-only product writes.
+                .requestMatchers(HttpMethod.GET, "/api/products/*/reviews", "/api/products/*/questions").permitAll()
+                .requestMatchers("/api/products/*/reviews/**", "/api/products/*/questions/**").authenticated()
                 // Public review reads
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 // Admin-only write operations on products
