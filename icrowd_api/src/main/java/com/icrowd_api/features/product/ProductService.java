@@ -54,19 +54,50 @@ public class ProductService {
     }
 
     public Page<Product> searchAndFilterProducts(String keyword, String category, String sortParam, int page, int size) {
-        Sort sort = Sort.unsorted();
-        if (sortParam != null) {
-            switch (sortParam.toLowerCase()) {
-                case "price_asc" -> sort = Sort.by(Sort.Direction.ASC, "price");
-                case "price_desc" -> sort = Sort.by(Sort.Direction.DESC, "price");
+        return browse(keyword, category, sortParam, page, size, null, null, null, false, null, false);
+    }
+
+    public Page<Product> browse(String keyword, String category, String sortParam, int page, int size,
+            java.math.BigDecimal minPrice, java.math.BigDecimal maxPrice, String brand, boolean inStock,
+            Double minRating, boolean admin) {
+        if (page < 0 || size < 1 || size > 100) throw new IllegalArgumentException("Page must be nonnegative and size must be between 1 and 100");
+        if ((minPrice != null && minPrice.signum() < 0) || (maxPrice != null && maxPrice.signum() < 0)
+                || (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0))
+            throw new IllegalArgumentException("Invalid price range");
+        if (minRating != null && (!Double.isFinite(minRating) || minRating < 0 || minRating > 5)) throw new IllegalArgumentException("Rating must be between 0 and 5");
+        String option = sortParam == null || sortParam.isBlank() ? "newest" : sortParam;
+        Sort sort = switch (option) {
+            case "price_asc" -> Sort.by("price");
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt");
+            case "rating" -> Sort.by(Sort.Direction.DESC, "averageRating", "reviewCount");
+            case "name_asc" -> Sort.by("name");
+            case "name_desc" -> Sort.by(Sort.Direction.DESC, "name");
+            default -> throw new IllegalArgumentException("Unsupported sort option");
+        };
+        org.springframework.data.jpa.domain.Specification<Product> spec = (product, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (!admin) predicates.add(cb.isTrue(product.get("isActive")));
+            if (keyword != null && !keyword.isBlank()) {
+                String pattern = "%" + keyword.trim().toLowerCase(java.util.Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                predicates.add(cb.or(cb.like(cb.lower(product.get("name")), pattern, '\\'),
+                        cb.like(cb.lower(product.get("description")), pattern, '\\'),
+                        cb.like(cb.lower(product.get("brand")), pattern, '\\'),
+                        cb.like(cb.lower(product.get("sku")), pattern, '\\')));
             }
-        }
-        Pageable pageable = PageRequest.of(page, size, sort);
-        return productRepository.searchAndFilterProducts(
-                (keyword == null) ? "" : keyword.trim(),
-                (category == null) ? "" : category.trim(),
-                pageable
-        );
+            if (category != null && !category.isBlank()) predicates.add(cb.equal(cb.lower(product.get("category").get("name")), category.trim().toLowerCase(java.util.Locale.ROOT)));
+            if (brand != null && !brand.isBlank()) predicates.add(cb.equal(cb.lower(product.get("brand")), brand.trim().toLowerCase(java.util.Locale.ROOT)));
+            if (minPrice != null) predicates.add(cb.greaterThanOrEqualTo(product.get("price"), minPrice));
+            if (maxPrice != null) predicates.add(cb.lessThanOrEqualTo(product.get("price"), maxPrice));
+            if (inStock) predicates.add(cb.greaterThan(product.get("availableStock"), 0));
+            if (minRating != null) predicates.add(cb.greaterThanOrEqualTo(product.get("averageRating"), minRating));
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var pageable = PageRequest.of(page, size, sort.and(Sort.by("id")));
+        Page<Product> result = productRepository.findAll(spec, pageable);
+        if (page > 0 && page >= result.getTotalPages())
+            result = productRepository.findAll(spec, PageRequest.of(Math.max(0, result.getTotalPages() - 1), size, pageable.getSort()));
+        return result;
     }
 
     public Product getProductById(Long id) {

@@ -2,12 +2,14 @@ import { test, expect } from '@playwright/test';
 
 async function setup(page, role = 'CUSTOMER') {
   page.on('pageerror', error => console.log('PAGE ERROR:', error.message));
-  page.on('requestfailed', request => console.log('REQUEST FAILED:', request.url(), request.failure()?.errorText));
-  await page.route(/^https:\/\//, route => route.abort());
+  // Fonts are external to these tests; return an empty stylesheet without network errors.
+  await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
+  await page.route('https://fonts.gstatic.com/**', route => route.abort());
   const reviews = { 1: [], 2: [] };
   const questions = { 1: [], 2: [] };
   if (role) await page.addInitScript(() => localStorage.setItem('token', 'test-token'));
-  await page.route('**/api/**', async route => {
+  // Match backend endpoints only. Vite also serves JS modules from /src/**/api/.
+  await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const req = route.request(); const path = new URL(req.url()).pathname; const method = req.method();
     let data = [];
     if (path === '/api/auth/me') data = { id: 1, firstName: 'Buyer', role };
