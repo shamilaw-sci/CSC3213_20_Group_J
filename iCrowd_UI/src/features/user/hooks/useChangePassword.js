@@ -31,8 +31,8 @@ export const useChangePassword = (onSuccess) => {
             return;
         }
 
-        if (passwordData.newPassword.length < 6) {
-            setError('New password must be at least 6 characters long.');
+        if (passwordData.newPassword.length < 8) {
+            setError('New password must be at least 8 characters long.');
             return;
         }
 

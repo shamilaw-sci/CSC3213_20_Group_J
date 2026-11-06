@@ -9,7 +9,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +61,9 @@ public class ProductService {
         LevenshteinDistance distance = new LevenshteinDistance();
 
         List<String> terms = allProducts.stream()
-                .map(Product::getName).distinct()
+                .map(p -> p != null ? p.getName() : "")
+                .filter(name -> name != null && !name.isEmpty())
+                .distinct()
                 .filter(name -> {
                     String lowerName = name.toLowerCase();
                     if (lowerName.contains(searchKey)) return true;
@@ -82,7 +83,9 @@ public class ProductService {
                 .limit(5).collect(Collectors.toList());
 
         List<String> categories = allProducts.stream()
-                .map(p -> p.getCategory().getName()).distinct()
+                .map(p -> (p != null && p.getCategory() != null) ? p.getCategory().getName() : "")
+                .filter(cat -> cat != null && !cat.isEmpty())
+                .distinct()
                 .filter(cat -> {
                     String lowerCat = cat.toLowerCase();
                     if (lowerCat.contains(searchKey)) return true;
@@ -155,14 +158,30 @@ public class ProductService {
                     .orElseThrow(() -> new RuntimeException("Category not found"));
             product.setCategory(category);
         }
-        if (request.name() != null) product.setName(request.name());
-        if (request.description() != null) product.setDescription(request.description());
-        if (request.price() != null) product.setPrice(request.price());
-        if (request.availableStock() != null) product.setAvailableStock(request.availableStock());
-        if (request.imageUrls() != null) product.setImageUrls(request.imageUrls());
-        if (request.tags() != null) product.setTags(request.tags());
-        if (request.isActive() != null) product.setIsActive(request.isActive());
-        if (request.sku() != null) product.setSku(request.sku());
+        if (request.name() != null) {
+            product.setName(request.name());
+        }
+        if (request.description() != null) {
+            product.setDescription(request.description());
+        }
+        if (request.price() != null) {
+            product.setPrice(request.price());
+        }
+        if (request.availableStock() != null) {
+            product.setAvailableStock(request.availableStock());
+        }
+        if (request.imageUrls() != null) {
+            product.setImageUrls(request.imageUrls());
+        }
+        if (request.tags() != null) {
+            product.setTags(request.tags());
+        }
+        if (request.isActive() != null) {
+            product.setIsActive(request.isActive());
+        }
+        if (request.sku() != null) {
+            product.setSku(request.sku());
+        }
 
         return productRepository.save(product);
     }

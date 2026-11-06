@@ -55,8 +55,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
                 // All /api/admin/** and /api/analytics/** require ADMIN role
                 .requestMatchers("/api/admin/**", "/api/analytics/**").hasRole("ADMIN")
-                // Auth/me and create-admin require authentication
-                .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
+                // Admin-only auth management
+                .requestMatchers("/api/auth/register-admin", "/api/auth/create-admin").hasRole("ADMIN")
+                // Auth/me and logout require authentication
+                .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
                 // User profile and address endpoints require authentication
                 .requestMatchers("/api/users/**").authenticated()
                 // Cart and order endpoints require authentication

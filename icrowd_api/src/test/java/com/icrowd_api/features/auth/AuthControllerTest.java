@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("unchecked")
 public class AuthControllerTest {
 
     @Mock
@@ -109,8 +110,8 @@ public class AuthControllerTest {
         Mockito.when(authentication.getPrincipal()).thenReturn(userDetails);
         Mockito.when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
-        // AuthController calls the 2-arg overload: generateToken(userDetails, role)
-        Mockito.when(jwtUtil.generateToken(any(org.springframework.security.core.userdetails.UserDetails.class), any(String.class)))
+        // AuthController calls generateToken(userDetails, role, tokenVersion)
+        Mockito.when(jwtUtil.generateToken(any(org.springframework.security.core.userdetails.UserDetails.class), any(String.class), any(Long.class)))
                 .thenReturn("mock-jwt-token");
         // findByEmail must return an Optional (not null) so the role lookup doesn't NPE
         Mockito.when(userService.findByEmail(email)).thenReturn(Optional.empty());
