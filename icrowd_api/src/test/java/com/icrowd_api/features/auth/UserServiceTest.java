@@ -2,9 +2,7 @@ package com.icrowd_api.features.auth;
 
 import com.icrowd_api.features.auth.dto.AddressDto;
 import com.icrowd_api.features.auth.dto.RegisterRequest;
-import com.icrowd_api.features.auth.dto.UpdateProfileRequest;
 import com.icrowd_api.features.auth.dto.UserProfileResponse;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -78,8 +75,30 @@ public class UserServiceTest {
         Mockito.when(passwordEncoder.encode(req.getPassword())).thenReturn("encodedAdminPass");
         Mockito.when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        String result = userService.registerAdmin(req);
+        assertEquals("Admin registered successfully!", result);
+    }
+
+    @Test
+    void testPublicRegistrationIgnoresAdminRole() {
+        RegisterRequest req = RegisterRequest.builder()
+                .email("hacker@test.com")
+                .password("hackerpass")
+                .firstName("Hacker")
+                .lastName("User")
+                .phone("+94771111111")
+                .role("ADMIN") // Publicly attempting to register as ADMIN
+                .build();
+
+        Mockito.when(userRepository.findByEmail(req.getEmail())).thenReturn(Optional.empty());
+        Mockito.when(passwordEncoder.encode(req.getPassword())).thenReturn("encodedPass");
+        org.mockito.ArgumentCaptor<User> userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
+        Mockito.when(userRepository.save(userCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
         String result = userService.registerUser(req);
         assertEquals("User registered successfully!", result);
+        // Verify public registration strictly assigned CUSTOMER role
+        assertEquals("CUSTOMER", userCaptor.getValue().getRole());
     }
 
     @Test

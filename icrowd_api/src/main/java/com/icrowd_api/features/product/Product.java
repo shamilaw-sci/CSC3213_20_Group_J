@@ -19,6 +19,7 @@ import org.hibernate.annotations.Check;
 
 @Entity
 @Table(name = "products")
+@SuppressWarnings("deprecation")
 @Check(constraints = "available_stock >= 0")
 @Data
 @NoArgsConstructor

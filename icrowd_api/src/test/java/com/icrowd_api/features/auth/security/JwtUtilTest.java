@@ -46,4 +46,11 @@ class JwtUtilTest {
 
         assertFalse(jwtUtil.validateToken(token, otherUser));
     }
+
+    @Test
+    void tokenPreservesTokenVersionAndRole() {
+        String token = jwtUtil.generateToken(user, "ADMIN", 5L);
+        assertEquals(5L, jwtUtil.extractTokenVersion(token));
+        assertEquals("ADMIN", jwtUtil.extractRole(token));
+    }
 }

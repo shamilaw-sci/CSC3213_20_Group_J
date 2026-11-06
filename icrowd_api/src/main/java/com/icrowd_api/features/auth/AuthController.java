@@ -4,11 +4,14 @@ import com.icrowd_api.features.auth.dto.RegisterRequest;
 import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import com.icrowd_api.features.auth.security.JwtUtil;
 import com.icrowd_api.features.auth.security.LoginAttemptService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -35,6 +38,9 @@ public class AuthController {
     @Autowired
     private LoginAttemptService loginAttemptService;
 
+    @Autowired(required = false)
+    private HttpServletRequest httpRequest;
+
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         String result = userService.registerUser(registerRequest);
@@ -44,12 +50,26 @@ public class AuthController {
         return ResponseEntity.badRequest().body(Map.of("message", result));
     }
 
+    /**
+     * Protected endpoint exclusively for authorized administrators to create new Admin accounts.
+     */
+    @PostMapping("/register-admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> registerAdmin(@Valid @RequestBody RegisterRequest registerRequest) {
+        String result = userService.registerAdmin(registerRequest);
+        if (result.contains("successfully")) {
+            return ResponseEntity.ok().body(Map.of("message", result));
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", result));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData) {
-        String email = loginData.get("email");
-        String password = loginData.get("password");
+        String email = loginData != null ? loginData.get("email") : null;
+        String password = loginData != null ? loginData.get("password") : null;
+        String clientIp = getClientIp();
 
-        if (loginAttemptService.isBlocked(email)) {
+        if (loginAttemptService.isBlocked(clientIp, email)) {
             return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
         }
 
@@ -58,12 +78,18 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(email, password)
             );
 
-            loginAttemptService.loginSucceeded(email);
+            loginAttemptService.loginSucceeded(clientIp, email);
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             Optional<User> userOpt = userService.findByEmail(email);
-            String role = userOpt.map(User::getRole).orElse("CUSTOMER");
-            String jwt = jwtUtil.generateToken(userDetails, role);
+            String role = (userOpt.isPresent() && userOpt.get().getRole() != null)
+                    ? userOpt.get().getRole()
+                    : "CUSTOMER";
+            Long tokenVersion = (userOpt.isPresent() && userOpt.get().getTokenVersion() != null)
+                    ? userOpt.get().getTokenVersion()
+                    : 1L;
+
+            String jwt = jwtUtil.generateToken(userDetails, role, tokenVersion);
 
             // Return richer UserProfileResponse so frontend gets firstName, lastName, etc.
             Optional<UserProfileResponse> userProfile = userService.getUserProfile(email);
@@ -73,13 +99,25 @@ public class AuthController {
             response.put("user", userProfile.orElse(null));
 
             return ResponseEntity.ok(response);
+        } catch (DisabledException e) {
+            return ResponseEntity.status(403).body(Map.of("message", "Account is suspended. Please contact support."));
+        } catch (LockedException e) {
+            return ResponseEntity.status(403).body(Map.of("message", "Account is locked. Please try again later."));
         } catch (Exception e) {
-            loginAttemptService.loginFailed(email);
-            if (loginAttemptService.isBlocked(email)) {
+            loginAttemptService.loginFailed(clientIp, email);
+            if (loginAttemptService.isBlocked(clientIp, email)) {
                 return ResponseEntity.status(401).body(Map.of("message", "Account is temporarily locked due to multiple failed login attempts. Please try again later."));
             }
             return ResponseEntity.status(401).body(Map.of("message", "Invalid email or password!"));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(Authentication authentication) {
+        if (authentication != null && authentication.getName() != null) {
+            userService.invalidateTokens(authentication.getName());
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
     @GetMapping("/me")
@@ -102,11 +140,22 @@ public class AuthController {
     @PostMapping("/create-admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createAdmin(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
+        String email = body != null ? body.get("email") : null;
         String result = userService.promoteToAdmin(email);
-        if (result.contains("successfully")) {
+        if (result != null && result.contains("successfully")) {
             return ResponseEntity.ok(Map.of("message", result));
         }
-        return ResponseEntity.badRequest().body(Map.of("message", result));
+        return ResponseEntity.badRequest().body(Map.of("message", result != null ? result : "Failed to promote user"));
+    }
+
+    private String getClientIp() {
+        if (httpRequest == null) {
+            return null;
+        }
+        String xf = httpRequest.getHeader("X-Forwarded-For");
+        if (xf != null && !xf.isBlank()) {
+            return xf.split(",")[0].trim();
+        }
+        return httpRequest.getRemoteAddr();
     }
 }

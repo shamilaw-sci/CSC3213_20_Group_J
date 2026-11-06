@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from './useAuth';
+import { registerAdmin } from '../api/authApi';
 
 /**
  * Custom hook containing business logic for Admins to create new Admin accounts.
@@ -20,7 +20,7 @@ export const useAdminRegisterForm = (onSuccess) => {
     const [formData, setFormData] = useState(initialFormState);
     const [formError, setFormError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
-    const { register, loading, error: authError } = useAuth();
+    const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -40,8 +40,14 @@ export const useAdminRegisterForm = (onSuccess) => {
             return;
         }
 
+        if (formData.password.length < 8) {
+            setFormError('Password must be at least 8 characters long.');
+            return;
+        }
+
+        setLoading(true);
         try {
-            await register({
+            await registerAdmin({
                 ...formData,
                 role: 'ADMIN' // Enforce Admin role
             });
@@ -49,7 +55,9 @@ export const useAdminRegisterForm = (onSuccess) => {
             setFormData(initialFormState);
             if (onSuccess) onSuccess();
         } catch (err) {
-            // Error handled by AuthContext
+            setFormError(err.response?.data?.message || 'Failed to create admin account.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -62,7 +70,7 @@ export const useAdminRegisterForm = (onSuccess) => {
     return {
         formData,
         loading,
-        error: formError || authError,
+        error: formError,
         successMessage,
         handleChange,
         handleSubmit,

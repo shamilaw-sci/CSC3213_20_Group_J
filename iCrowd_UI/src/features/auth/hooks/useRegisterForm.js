@@ -45,6 +45,11 @@ export const useRegisterForm = () => {
             return;
         }
 
+        if (formData.password.length < 8) {
+            setFormError('Password must be at least 8 characters long.');
+            return;
+        }
+
         try {
             await register({
                 ...formData,

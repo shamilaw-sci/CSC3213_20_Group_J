@@ -1,13 +1,20 @@
 package com.icrowd_api.features.auth;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
+/**
+ * Seeds demonstration accounts for development and test environments.
+ * Restricted to non-production profiles (@Profile("!prod")).
+ */
 @Component
+@Profile("!prod")
 public class AdminDataInitializer implements CommandLineRunner {
 
     @Autowired
@@ -15,6 +22,18 @@ public class AdminDataInitializer implements CommandLineRunner {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Value("${app.default-admin.email:admin@icrowd.com}")
+    private String defaultAdminEmail;
+
+    @Value("${app.default-admin.password:Admin@1234}")
+    private String defaultAdminPassword;
+
+    @Value("${app.default-customer.email:customer@icrowd.com}")
+    private String defaultCustomerEmail;
+
+    @Value("${app.default-customer.password:Customer@1234}")
+    private String defaultCustomerPassword;
 
     @Override
     public void run(String... args) throws Exception {
@@ -27,21 +46,22 @@ public class AdminDataInitializer implements CommandLineRunner {
                     .build();
 
             User adminUser = User.builder()
-                    .email("admin@icrowd.com")
-                    .password(passwordEncoder.encode("Admin@1234"))
+                    .email(defaultAdminEmail)
+                    .password(passwordEncoder.encode(defaultAdminPassword))
                     .role("ADMIN")
                     .accountStatus("ACTIVE")
+                    .tokenVersion(1L)
                     .admin(adminProfile)
                     .build();
 
             adminProfile.setUser(adminUser);
 
             userRepository.save(adminUser); // CascadeType.ALL saves Admin automatically
-            System.out.println("✅ Default admin created: admin@icrowd.com / Admin@1234");
+            System.out.println("✅ Initialized default admin account for: " + defaultAdminEmail);
         }
 
         // 2. Create default customer account if none exists
-        if (!userRepository.existsByEmail("customer@icrowd.com")) {
+        if (!userRepository.existsByEmail(defaultCustomerEmail)) {
             Customer customerProfile = Customer.builder()
                     .firstName("Kamal")
                     .lastName("Perera")
@@ -51,10 +71,11 @@ public class AdminDataInitializer implements CommandLineRunner {
                     .build();
 
             User customerUser = User.builder()
-                    .email("customer@icrowd.com")
-                    .password(passwordEncoder.encode("Customer@1234"))
+                    .email(defaultCustomerEmail)
+                    .password(passwordEncoder.encode(defaultCustomerPassword))
                     .role("CUSTOMER")
                     .accountStatus("ACTIVE")
+                    .tokenVersion(1L)
                     .customer(customerProfile)
                     .build();
 
@@ -94,7 +115,7 @@ public class AdminDataInitializer implements CommandLineRunner {
             customerProfile.getAddresses().add(address2);
 
             userRepository.save(customerUser); // CascadeType.ALL saves Customer and Addresses
-            System.out.println("✅ Default customer created: customer@icrowd.com / Customer@1234");
+            System.out.println("✅ Initialized default customer account for: " + defaultCustomerEmail);
         }
     }
 }

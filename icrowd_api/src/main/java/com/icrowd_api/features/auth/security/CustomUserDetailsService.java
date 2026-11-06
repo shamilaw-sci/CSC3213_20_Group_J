@@ -36,9 +36,17 @@ public class CustomUserDetailsService implements UserDetailsService {
             authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
         }
 
+        boolean enabled = user.getAccountStatus() == null || "ACTIVE".equalsIgnoreCase(user.getAccountStatus());
+        boolean accountNonLocked = user.getAccountStatus() == null 
+                || (!"LOCKED".equalsIgnoreCase(user.getAccountStatus()) && !"SUSPENDED".equalsIgnoreCase(user.getAccountStatus()));
+
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
+                enabled,
+                true,
+                true,
+                accountNonLocked,
                 authorities
         );
     }

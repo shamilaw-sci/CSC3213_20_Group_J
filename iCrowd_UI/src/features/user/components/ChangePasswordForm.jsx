@@ -51,7 +51,7 @@ const ChangePasswordForm = () => {
                     name="newPassword"
                     type="password"
                     label="New Password"
-                    placeholder="Minimum 6 characters"
+                    placeholder="Minimum 8 characters"
                     required
                     value={passwordData.newPassword}
                     onChange={handleChange}
