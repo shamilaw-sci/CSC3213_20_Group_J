@@ -315,9 +315,15 @@ public class OrderService {
                 && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY)
             return orderResponse(order);
         var attempts = paymentRepository.findByOrderId(orderId);
-        if (order.getPaymentMethod() != PaymentMethod.CARD || order.getStatus() != OrderStatus.FAILED
-                || order.getPaymentStatus() != PaymentStatus.FAILED || order.isStockAllocated()
-                || attempts.isEmpty() || attempts.stream().anyMatch(p -> p.getStatus() != PaymentStatus.FAILED))
+        boolean isFailedCardPayment = order.getStatus() == OrderStatus.FAILED
+                && order.getPaymentStatus() == PaymentStatus.FAILED
+                && !attempts.isEmpty()
+                && attempts.stream().allMatch(p -> p.getStatus() == PaymentStatus.FAILED);
+        boolean isUninitiatedCardPayment = order.getStatus() == OrderStatus.PENDING_PAYMENT
+                && attempts.isEmpty();
+
+        if (order.getPaymentMethod() != PaymentMethod.CARD || order.isStockAllocated()
+                || (!isFailedCardPayment && !isUninitiatedCardPayment))
             throw new IllegalArgumentException("Switching to COD requires a confirmed failed card payment. Pending payments must be verified first.");
         if (!stockAllocationService.allocate(order))
             throw new OutOfStockException(order.getUnavailableProductId(), order.getUnavailableProductName());
