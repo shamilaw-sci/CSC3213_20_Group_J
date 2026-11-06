@@ -4,6 +4,8 @@ import { useProductDetail } from '../hooks/useProductDetail';
 import ProductSlider from '../components/ProductSlider';
 import { fetchSimilarProducts } from '../api/recommendationApi';
 import { Star } from 'lucide-react';
+import ReviewSection from '../../review/components/ReviewSection';
+import QuestionSection from '../../review/components/QuestionSection';
 
 import ProductImageGallery from '../components/ProductImageGallery';
 import ProductFeatures from '../components/ProductFeatures';
@@ -14,7 +16,7 @@ import BuyNowButton from '../../../components/ui/BuyNowButton';
 const ProductDetailPage = () => {
   const { id } = useParams();
   
-  const { product, loading, error } = useProductDetail(id);
+  const { product, loading, error, refresh } = useProductDetail(id);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [similarLoading, setSimilarLoading] = useState(false);
 
@@ -99,11 +101,11 @@ const ProductDetailPage = () => {
           <div className="flex items-center gap-4 mb-6">
             <div className="flex text-amber-400">
               {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="w-5 h-5 fill-current" />
+                <Star key={star} className={`w-5 h-5 ${star <= Math.round(product.averageRating || 0) ? "fill-current" : "text-gray-300"}`} />
               ))}
             </div>
-            <span className="text-black font-bold text-lg">5.0</span>
-            <span className="text-gray-500 font-medium text-sm">(124 reviews)</span>
+            <span className="text-black font-bold text-lg">{product.reviewCount ? Number(product.averageRating).toFixed(1) : "Not rated"}</span>
+            <span className="text-gray-500 font-medium text-sm">({product.reviewCount || 0} reviews)</span>
           </div>
           
           <p className="text-gray-700 font-medium leading-relaxed mb-8">
@@ -138,11 +140,8 @@ const ProductDetailPage = () => {
       {/* 2. Technical Specifications */}
       <ProductSpecs specifications={product.specifications} />
 
-      {/* 2. Product Feedback / Reviews (Dummy Component) */}
-      <div className="mb-20 bg-[#F6F6F6] p-8 md:p-12 rounded-[32px]">
-        <h3 className="text-2xl font-bold text-black mb-6">Customer Feedback</h3>
-        <p className="text-gray-500 font-medium italic">No reviews yet. Be the first to review this product!</p>
-      </div>
+      <ReviewSection key={'reviews-' + id} productId={id} onChanged={refresh} />
+      <QuestionSection key={'questions-' + id} productId={id} />
 
       {/* 3. Product Slider for Similar Suggestions */}
       <ProductSlider 

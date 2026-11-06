@@ -42,6 +42,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/suggestions", "/api/products/recommendations", "/api/products/featured", "/api/products/latest", "/api/products/*/similar", "/api/products/cart-suggestions").permitAll()
                 // Public category read endpoints (needed for dropdowns)
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}").permitAll()
+                // Feedback rules must precede admin-only product writes.
+                .requestMatchers(HttpMethod.GET, "/api/products/*/reviews", "/api/products/*/questions").permitAll()
+                .requestMatchers("/api/products/*/reviews/**", "/api/products/*/questions/**").authenticated()
                 // Public review reads
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 // Public promo availability check
@@ -68,12 +71,18 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**", "/api/analytics/**").hasRole("ADMIN")
 
                 // ── Authenticated users ───────────────────────────────────────────
-                // Auth/me and create-admin require authentication
-                .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
+                // Admin-only auth management
+                .requestMatchers("/api/auth/register-admin", "/api/auth/create-admin").hasRole("ADMIN")
+                // Auth/me and logout require authentication
+                .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
                 // User profile and address endpoints require authentication
                 .requestMatchers("/api/users/**").authenticated()
                 // Cart and order endpoints require authentication
                 .requestMatchers("/api/cart/**", "/api/orders/**").authenticated()
+                // Gateway payment notification callback is public (server-to-server)
+                .requestMatchers(HttpMethod.POST, "/api/payments/notify").permitAll()
+                // All other payment endpoints require authentication
+                .requestMatchers("/api/payments/**").authenticated()
                 // Everything else requires authentication
                 .anyRequest().authenticated()
             )
@@ -89,7 +98,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // HEAD: localhost:5173 | developer: adds 127.0.0.1:5173 and localhost:3000
         configuration.setAllowedOrigins(List.of(
             "http://localhost:5173",
             "http://127.0.0.1:5173",

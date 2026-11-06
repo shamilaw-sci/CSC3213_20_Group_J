@@ -29,12 +29,13 @@ public class ProductController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        if (keyword != null || category != null || sort != null) {
-            return ResponseEntity.ok(productService.searchAndFilterProducts(keyword, category, sort, page, size));
-        }
-        return ResponseEntity.ok(productService.getAllActiveProducts(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @RequestParam(required = false) String brand,
+            @RequestParam(defaultValue = "false") boolean inStock,
+            @RequestParam(required = false) Double minRating) {
+        return ResponseEntity.ok(productService.browse(keyword, category, sort, page, size, minPrice, maxPrice, brand, inStock, minRating, false));
     }
 
     @GetMapping("/{id}")
@@ -101,8 +102,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<Page<Product>> getAllProductsForAdmin(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(productService.getAllProductsForAdmin(page, size));
+            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(productService.browse(keyword, null, "newest", page, size, null, null, null, false, null, true));
     }
 
     @GetMapping("/admin/stats")

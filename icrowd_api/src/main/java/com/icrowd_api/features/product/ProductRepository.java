@@ -13,11 +13,19 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.Modifying;
 
 @Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
+public interface ProductRepository extends JpaRepository<Product, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product> {
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findForCheckout(@Param("id") Long id);
 
     @Modifying
-    @Query("UPDATE Product p SET p.availableStock = p.availableStock - :quantity WHERE p.id = :productId AND p.availableStock >= :quantity")
+    @Query("UPDATE Product p SET p.availableStock = p.availableStock - :quantity WHERE p.id = :productId AND :quantity > 0 AND p.availableStock >= :quantity")
     int atomicDecrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Modifying
+    @Query("UPDATE Product p SET p.availableStock = p.availableStock + :quantity WHERE p.id = :productId")
+    void atomicIncrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
     Optional<Product> findBySku(String sku);
     boolean existsBySku(String sku);

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { getCurrentUser, loginUser, registerUser } from '../api/authApi';
+import { getCurrentUser, loginUser, registerUser, logoutUser } from '../api/authApi';
 
 export const AuthContext = createContext(null);
 
@@ -57,9 +57,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
+    const logout = async () => {
+        try {
+            await logoutUser();
+        } catch (e) {
+            // Ignore failure on logout call
+        } finally {
+            localStorage.removeItem('token');
+            setUser(null);
+        }
     };
 
     const updateUser = (updatedUserData) => {

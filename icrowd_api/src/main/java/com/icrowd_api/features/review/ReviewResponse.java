@@ -9,6 +9,9 @@ import java.time.LocalDateTime;
 @Builder
 public class ReviewResponse {
     private Long id;
+    private Long userId;
+    private Long productId;
+    private String productName;
     private Integer rating;
     private String title;
     private String comment;
@@ -29,6 +32,9 @@ public class ReviewResponse {
 
         return ReviewResponse.builder()
                 .id(review.getId())
+                .userId(review.getUser().getId())
+                .productId(review.getProduct().getId())
+                .productName(review.getProduct().getName())
                 .rating(review.getRating())
                 .title(review.getTitle())
                 .comment(review.getComment())

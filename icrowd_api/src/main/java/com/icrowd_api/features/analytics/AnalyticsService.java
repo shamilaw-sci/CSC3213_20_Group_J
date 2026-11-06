@@ -117,7 +117,7 @@ public class AnalyticsService {
             }
         }
 
-        lowStockItems.sort(Comparator.comparingInt(AnalyticsSummaryDto.LowStockItemDto::getStock));
+        lowStockItems.sort((a, b) -> Integer.compare(a.getStock(), b.getStock()));
 
         // 2. Filter Orders according to Date Range
         List<Order> filteredOrders = orders.stream()
@@ -214,8 +214,8 @@ public class AnalyticsService {
 
         // Top category
         String topCategory = categoryUnitsSold.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
+                .max((e1, e2) -> Integer.compare(e1.getValue(), e2.getValue()))
+                .map(entry -> entry.getKey())
                 .orElse("Headset");
 
         // Profit Calculations
@@ -249,7 +249,7 @@ public class AnalyticsService {
         List<AnalyticsSummaryDto.ProfitAnalysisDto> profitAnalysis = generateProfitAnalysis(appliedRange, totalRevenue);
 
         // 5. Category Distribution Chart
-        int sumCategoryUnits = categoryUnitsSold.values().stream().mapToInt(Integer::intValue).sum();
+        int sumCategoryUnits = categoryUnitsSold.values().stream().mapToInt(val -> val != null ? val : 0).sum();
         if (sumCategoryUnits == 0) sumCategoryUnits = 1;
         final int finalSumUnits = sumCategoryUnits;
 

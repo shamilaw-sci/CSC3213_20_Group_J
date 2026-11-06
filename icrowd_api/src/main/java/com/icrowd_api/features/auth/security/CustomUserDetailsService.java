@@ -49,16 +49,18 @@ public class CustomUserDetailsService implements UserDetailsService {
             }
         }
 
-        // Determine if account is enabled — only ACTIVE accounts can authenticate
-        boolean enabled = "ACTIVE".equalsIgnoreCase(user.getAccountStatus());
+        boolean enabled = user.getAccountStatus() == null 
+                || (!"DEACTIVATED".equalsIgnoreCase(user.getAccountStatus()) && !"SUSPENDED".equalsIgnoreCase(user.getAccountStatus()));
+        boolean accountNonLocked = user.getAccountStatus() == null 
+                || !"LOCKED".equalsIgnoreCase(user.getAccountStatus());
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
-                enabled,          // enabled
-                true,             // accountNonExpired
-                true,             // credentialsNonExpired
-                true,             // accountNonLocked (lockout handled by LoginAttemptService)
+                enabled,
+                true,
+                true,
+                accountNonLocked,
                 authorities
         );
     }

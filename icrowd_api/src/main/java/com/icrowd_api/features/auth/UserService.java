@@ -47,63 +47,83 @@ public class UserService {
             return "Email already exists!";
         }
 
-        String role = (request.getRole() != null && request.getRole().equalsIgnoreCase("ADMIN"))
-                ? "ADMIN"
-                : "CUSTOMER";
+        // Security: Public registration MUST ALWAYS assign CUSTOMER role
+        String role = "CUSTOMER";
 
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .accountStatus("ACTIVE")
+                .tokenVersion(1L)
                 .build();
 
-        if ("ADMIN".equals(role)) {
-            Admin admin = Admin.builder()
-                    .user(user)
-                    .firstName(request.getFirstName())
-                    .lastName(request.getLastName())
+        Customer customer = Customer.builder()
+                .user(user)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phone(request.getPhone())
+                .dateOfBirth(request.getDateOfBirth())
+                .profileImage(request.getProfileImage())
+                .addresses(new ArrayList<>())
+                .build();
+
+        String addrLine1 = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
+        if (addrLine1 != null && !addrLine1.trim().isEmpty()) {
+            Address address = Address.builder()
+                    .customer(customer)
+                    .recipientName((request.getFirstName() + " " + request.getLastName()).trim())
                     .phone(request.getPhone())
+                    .addressLine1(addrLine1.trim())
+                    .addressLine2(request.getAddressLine2())
+                    .city(request.getCity() != null ? request.getCity().trim() : "Colombo")
+                    .district(request.getDistrict())
+                    .province(request.getProvince())
+                    .postalCode(request.getPostalCode())
+                    .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka")
+                    .addressType("HOME")
+                    .isDefault(true)
+                    .latitude(request.getLatitude())
+                    .longitude(request.getLongitude())
                     .build();
-            user.setAdmin(admin);
-        } else {
-            Customer customer = Customer.builder()
-                    .user(user)
-                    .firstName(request.getFirstName())
-                    .lastName(request.getLastName())
-                    .phone(request.getPhone())
-                    .dateOfBirth(request.getDateOfBirth())
-                    .profileImage(request.getProfileImage())
-                    .addresses(new ArrayList<>())
-                    .build();
 
-            String addrLine1 = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
-            if (addrLine1 != null && !addrLine1.trim().isEmpty()) {
-                Address address = Address.builder()
-                        .customer(customer)
-                        .recipientName((request.getFirstName() + " " + request.getLastName()).trim())
-                        .phone(request.getPhone())
-                        .addressLine1(addrLine1.trim())
-                        .addressLine2(request.getAddressLine2())
-                        .city(request.getCity() != null ? request.getCity().trim() : "Colombo")
-                        .district(request.getDistrict())
-                        .province(request.getProvince())
-                        .postalCode(request.getPostalCode())
-                        .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka")
-                        .addressType("HOME")
-                        .isDefault(true)
-                        .latitude(request.getLatitude())
-                        .longitude(request.getLongitude())
-                        .build();
-
-                customer.getAddresses().add(address);
-            }
-
-            user.setCustomer(customer);
+            customer.getAddresses().add(address);
         }
 
+        user.setCustomer(customer);
         userRepository.save(user);
         return "User registered successfully!";
+    }
+
+    /**
+     * Dedicated protected workflow for administrator creation.
+     * Can only be called via authenticated admin-protected endpoints.
+     */
+    @Transactional
+    public String registerAdmin(RegisterRequest request) {
+        Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
+        if (existingUser.isPresent()) {
+            return "Email already exists!";
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role("ADMIN")
+                .accountStatus("ACTIVE")
+                .tokenVersion(1L)
+                .build();
+
+        Admin admin = Admin.builder()
+                .user(user)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phone(request.getPhone())
+                .build();
+        user.setAdmin(admin);
+
+        userRepository.save(user);
+        return "Admin registered successfully!";
     }
 
     @Transactional(readOnly = true)
@@ -376,8 +396,22 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        // Invalidate existing tokens on password change
+        user.setTokenVersion(user.getTokenVersion() == null ? 2L : user.getTokenVersion() + 1L);
         userRepository.save(user);
         return true;
+    }
+
+    /**
+     * Increments the token version for the user, instantly invalidating any active JWT sessions.
+     */
+    @Transactional
+    public void invalidateTokens(String email) {
+        if (email == null) return;
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setTokenVersion(user.getTokenVersion() == null ? 2L : user.getTokenVersion() + 1L);
+            userRepository.save(user);
+        });
     }
 
     // ==========================================

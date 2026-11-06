@@ -5,6 +5,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -18,6 +19,12 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .orElse("Validation failed");
         return ResponseEntity.badRequest().body(Map.of("message", errorMessage));
+    }
+
+    /** Handles ResponseStatusException from services/controllers. */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<?> handleStatus(ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message", ex.getReason() == null ? "Request failed" : ex.getReason()));
     }
 
     /** Handles business-rule violations (e.g. demoting last admin). */

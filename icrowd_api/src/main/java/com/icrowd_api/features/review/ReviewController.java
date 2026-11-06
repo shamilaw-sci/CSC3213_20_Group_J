@@ -26,6 +26,14 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.getProductReviews(productId, page, size));
     }
 
+    @PutMapping("/{reviewId}")
+    public ReviewResponse update(@PathVariable Long productId, @PathVariable Long reviewId, @Valid @RequestBody ReviewRequest request, Authentication authentication) {
+        return reviewService.update(productId, reviewId, authentication.getName(), request);
+    }
+    @DeleteMapping("/{reviewId}")
+    public ResponseEntity<Void> delete(@PathVariable Long productId, @PathVariable Long reviewId, Authentication authentication) {
+        reviewService.delete(productId, reviewId, authentication.getName()); return ResponseEntity.noContent().build();
+    }
     @PostMapping
     public ResponseEntity<ReviewResponse> addReview(
             @PathVariable Long productId,
