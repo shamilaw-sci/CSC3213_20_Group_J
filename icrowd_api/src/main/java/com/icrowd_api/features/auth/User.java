@@ -42,7 +42,7 @@ public class User {
     private String accountStatus = "ACTIVE"; // ACTIVE, LOCKED, SUSPENDED
 
     @Builder.Default
-    @Column(name = "token_version", nullable = false)
+    @Column(name = "token_version", nullable = false, columnDefinition = "bigint default 1")
     private Long tokenVersion = 1L;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
