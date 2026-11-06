@@ -1,1 +1,23 @@
-# CSC3213_20_Group_J
+# iCrowd E-commerce Platform
+
+## Introduction
+Welcome to the iCrowd E-commerce Platform! This project is a centralized digital storefront built specifically for phone accessories. It is designed to upgrade traditional retail operations into a fully scalable, digital experience, providing an easy-to-use shopping interface for customers and powerful inventory management tools for store administrators.
+
+## Project Outline
+This platform is built using a **Monorepo** structure, meaning both the frontend user interface and the backend server code are housed in this single repository. It follows a **Vertical Slice** architecture, where code is organized by features (like Products, Cart, Auth) rather than by technical layers.
+
+### 1. Frontend Interface (`iCrowd_UI`)
+The frontend is built using **React** and styled with **Tailwind CSS v4**. It provides a responsive, dynamic experience for users to:
+- Browse the product catalog with advanced filtering and search features (including typo auto-correction).
+- View detailed product pages and manage their shopping cart.
+- Securely log in and track their orders.
+- (For Admins) Manage inventory and view analytics dashboards.
+
+### 2. Backend Server (`icrowd_api`)
+The backend is a RESTful API built with **Java Spring Boot**. It handles all the heavy lifting and business logic:
+- **Database Management:** Safely stores products, categories, and user data.
+- **Data Integrity:** Utilizes ACID-compliant transactions and row-level locking to prevent inventory overselling when multiple customers check out simultaneously.
+- **Security:** Protects routes using Role-Based Access Control (RBAC) and JSON Web Tokens (JWT) to ensure customers cannot access admin privileges.
+
+## Feature Documentation
+For detailed information on exactly how specific features are built, please check the `product.md` (or similar feature files) located inside the respective feature folders of both the frontend and backend.
