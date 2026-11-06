@@ -123,7 +123,7 @@ public class PromoCodeService {
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
                 .filter(p -> p.getStartDate() == null || !p.getStartDate().isAfter(today))
                 .filter(p -> p.getExpiryDate() == null || !p.getExpiryDate().isBefore(today))
-                .filter(p -> p.getTotalUsageLimit() == null || p.getUsageCount() < p.getTotalUsageLimit())
+                .filter(p -> p.getTotalUsageLimit() == null || promoCodeUsageRepository.countConfirmedByPromoCode(p) < p.getTotalUsageLimit())
                 .filter(p -> {
                     // Check customer eligibility
                     if (p.getCustomerEligibility() == CustomerEligibility.NEW_CUSTOMERS) {
@@ -184,7 +184,8 @@ public class PromoCodeService {
         if (promo.getExpiryDate() != null && promo.getExpiryDate().isBefore(today)) {
             return fail("This promo code has expired.");
         }
-        if (promo.getTotalUsageLimit() != null && promo.getUsageCount() >= promo.getTotalUsageLimit()) {
+        long confirmedUsages = promoCodeUsageRepository.countConfirmedByPromoCode(promo);
+        if (promo.getTotalUsageLimit() != null && confirmedUsages >= promo.getTotalUsageLimit()) {
             return fail("This promo code has reached its usage limit.");
         }
         if (promo.getMinimumOrderAmount() != null
