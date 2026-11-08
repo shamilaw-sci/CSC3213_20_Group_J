@@ -1,5 +1,6 @@
 package com.icrowd_api.features.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -29,6 +30,7 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore
     @NotBlank(message = "Password is required")
     @Column(nullable = false)
     private String password;
@@ -41,6 +43,7 @@ public class User {
     @Column(nullable = false)
     private String accountStatus = "ACTIVE"; // ACTIVE, LOCKED, SUSPENDED
 
+    @JsonIgnore
     @Builder.Default
     @Column(name = "token_version", nullable = false, columnDefinition = "bigint default 1")
     private Long tokenVersion = 1L;

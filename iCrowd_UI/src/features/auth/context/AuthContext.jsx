@@ -64,6 +64,27 @@ export const AuthProvider = ({ children }) => {
             // Ignore failure on logout call
         } finally {
             localStorage.removeItem('token');
+            // Remove sensitive cached data on logout and reset state when accounts change
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (
+                    key && (
+                        key.startsWith('user_addresses_') ||
+                        key === 'user_addresses_default' ||
+                        key.startsWith('user_profile_') ||
+                        key === 'iCrowd_cart' ||
+                        key.startsWith('completed-order-') ||
+                        key.startsWith('iCrowd_')
+                    )
+                ) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            try {
+                sessionStorage.clear();
+            } catch (e) {}
             setUser(null);
         }
     };

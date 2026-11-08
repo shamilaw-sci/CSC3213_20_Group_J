@@ -4,8 +4,8 @@ import AuthButton from '../../auth/component/AuthButton';
 import AuthAlert from '../../auth/component/AuthAlert';
 
 /**
- * Dumb Component: EditProfileForm
- * Form for updating user profile attributes (excluding email/role which are locked).
+ * EditProfileForm Component
+ * Form for updating user profile attributes with input validation.
  */
 const EditProfileForm = ({
     formData,
@@ -48,6 +48,7 @@ const EditProfileForm = ({
                         name="firstName"
                         label="First Name"
                         required
+                        maxLength={50}
                         value={formData.firstName}
                         onChange={onChange}
                     />
@@ -57,6 +58,7 @@ const EditProfileForm = ({
                         name="lastName"
                         label="Last Name"
                         required
+                        maxLength={50}
                         value={formData.lastName}
                         onChange={onChange}
                     />
@@ -67,14 +69,31 @@ const EditProfileForm = ({
                         type="tel"
                         label="Phone Number"
                         required
+                        placeholder="+94 77 123 4567"
                         value={formData.phone}
                         onChange={onChange}
                     />
+
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                            Date of Birth <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                        </label>
+                        <input
+                            type="date"
+                            id="dateOfBirth"
+                            name="dateOfBirth"
+                            value={formData.dateOfBirth || ''}
+                            onChange={onChange}
+                            max={new Date().toISOString().split('T')[0]}
+                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black"
+                        />
+                    </div>
 
                     <AuthInput
                         id="district"
                         name="district"
                         label="District"
+                        maxLength={100}
                         value={formData.district}
                         onChange={onChange}
                     />
@@ -83,17 +102,33 @@ const EditProfileForm = ({
                         id="city"
                         name="city"
                         label="City"
+                        maxLength={100}
                         value={formData.city}
                         onChange={onChange}
                     />
 
-                    <AuthInput
-                        id="address"
-                        name="address"
-                        label="Street Address"
-                        value={formData.address}
-                        onChange={onChange}
-                    />
+                    <div className="md:col-span-2">
+                        <AuthInput
+                            id="address"
+                            name="address"
+                            label="Street Address"
+                            maxLength={255}
+                            value={formData.address}
+                            onChange={onChange}
+                        />
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <AuthInput
+                            id="profileImage"
+                            name="profileImage"
+                            label="Profile Avatar URL (Optional)"
+                            maxLength={2048}
+                            placeholder="https://example.com/photo.jpg"
+                            value={formData.profileImage || ''}
+                            onChange={onChange}
+                        />
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
@@ -101,7 +136,7 @@ const EditProfileForm = ({
                         type="button"
                         onClick={onCancel}
                         disabled={loading}
-                        className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors text-sm"
+                        className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors text-sm cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -110,7 +145,7 @@ const EditProfileForm = ({
                         type="submit"
                         loading={loading}
                         loadingText="Saving Changes..."
-                        className="w-auto px-8"
+                        className="w-auto px-8 cursor-pointer"
                     >
                         Save Changes
                     </AuthButton>

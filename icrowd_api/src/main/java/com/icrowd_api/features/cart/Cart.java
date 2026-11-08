@@ -1,5 +1,6 @@
 package com.icrowd_api.features.cart;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.icrowd_api.features.auth.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -25,6 +26,7 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonIgnore
     @OneToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, unique = true)
     private User user;

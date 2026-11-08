@@ -438,4 +438,15 @@ public class OrderService {
     public Order findById(Long orderId) {
         return orderRepository.findById(orderId).orElse(null);
     }
+
+    @Transactional(readOnly = true)
+    public List<CustomerOrderResponseDto> getCustomerOrders(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        return orders.stream()
+                .map(CustomerOrderResponseDto::fromEntity)
+                .collect(java.util.stream.Collectors.toList());
+    }
+    }
 }
