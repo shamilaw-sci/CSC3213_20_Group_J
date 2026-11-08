@@ -435,11 +435,10 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+<<<<<<< HEAD
     public Order findById(Long orderId) {
         return orderRepository.findById(orderId).orElse(null);
-    }
-
-    @Transactional(readOnly = true)
+=======
     public List<CustomerOrderResponseDto> getCustomerOrders(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
@@ -447,6 +446,6 @@ public class OrderService {
         return orders.stream()
                 .map(CustomerOrderResponseDto::fromEntity)
                 .collect(java.util.stream.Collectors.toList());
-    }
+>>>>>>> f2c12e0 (feat(profile): resolve customer profile management security, validation, atomic default address, and real account screens)
     }
 }
