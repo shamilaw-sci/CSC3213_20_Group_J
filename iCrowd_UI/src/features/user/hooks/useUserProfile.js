@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/hooks/useAuth';
 
 /**
  * Custom Hook: useUserProfile
- * Handles user profile fetching, updating, state management, and synchronization.
+ * Handles user profile fetching, updating, state management, and validation.
  */
 export const useUserProfile = () => {
     const { user: authUser, updateUser } = useAuth();
@@ -15,7 +15,11 @@ export const useUserProfile = () => {
         phone: '',
         address: '',
         district: '',
-        city: ''
+        city: '',
+        province: '',
+        postalCode: '',
+        dateOfBirth: '',
+        profileImage: ''
     });
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
@@ -35,11 +39,14 @@ export const useUserProfile = () => {
                 phone: data.phone || '',
                 address: data.address || '',
                 district: data.district || '',
-                city: data.city || ''
+                city: data.city || '',
+                province: data.province || '',
+                postalCode: data.postalCode || '',
+                dateOfBirth: data.dateOfBirth || '',
+                profileImage: data.profileImage || ''
             });
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load profile details.');
-            // Fallback to authUser if available
             if (authUser) {
                 setProfile(authUser);
                 setFormData({
@@ -48,7 +55,11 @@ export const useUserProfile = () => {
                     phone: authUser.phone || '',
                     address: authUser.address || '',
                     district: authUser.district || '',
-                    city: authUser.city || ''
+                    city: authUser.city || '',
+                    province: authUser.province || '',
+                    postalCode: authUser.postalCode || '',
+                    dateOfBirth: authUser.dateOfBirth || '',
+                    profileImage: authUser.profileImage || ''
                 });
             }
         } finally {
@@ -66,14 +77,73 @@ export const useUserProfile = () => {
         if (error) setError(null);
     };
 
+    const validateProfile = () => {
+        const trimmedFirst = formData.firstName.trim();
+        const trimmedLast = formData.lastName.trim();
+        const trimmedPhone = formData.phone.trim();
+
+        if (!trimmedFirst || !trimmedLast || !trimmedPhone) {
+            return 'Please fill in required fields (First Name, Last Name, Phone Number).';
+        }
+
+        if (trimmedFirst.length > 50) {
+            return 'First name must not exceed 50 characters.';
+        }
+        if (trimmedLast.length > 50) {
+            return 'Last name must not exceed 50 characters.';
+        }
+
+        const cleanPhone = trimmedPhone.replace(/[\s-]/g, '');
+        if (!/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+            return 'Phone number must contain 7 to 15 digits (e.g. +94771234567 or 0771234567).';
+        }
+
+        if (formData.address && formData.address.length > 255) {
+            return 'Address must not exceed 255 characters.';
+        }
+        if (formData.city && formData.city.length > 100) {
+            return 'City must not exceed 100 characters.';
+        }
+        if (formData.district && formData.district.length > 100) {
+            return 'District must not exceed 100 characters.';
+        }
+        if (formData.province && formData.province.length > 100) {
+            return 'Province must not exceed 100 characters.';
+        }
+        if (formData.postalCode && formData.postalCode.length > 20) {
+            return 'Postal code must not exceed 20 characters.';
+        }
+        if (formData.postalCode && !/^[0-9A-Za-z -]{0,20}$/.test(formData.postalCode)) {
+            return 'Invalid postal code format.';
+        }
+
+        if (formData.dateOfBirth) {
+            const dob = new Date(formData.dateOfBirth);
+            const now = new Date();
+            if (dob >= now) {
+                return 'Birth date must be in the past.';
+            }
+        }
+
+        if (formData.profileImage && formData.profileImage.length > 2048) {
+            return 'Profile image URL must not exceed 2048 characters.';
+        }
+        if (formData.profileImage && !/^(https?:\/\/.*)?$/.test(formData.profileImage)) {
+            return 'Profile image must be a valid HTTP or HTTPS URL.';
+        }
+
+        return null;
+    };
+
     const handleSave = async (e) => {
         if (e) e.preventDefault();
         setUpdating(true);
         setError(null);
         setSuccessMessage('');
 
-        if (!formData.firstName || !formData.lastName || !formData.phone) {
-            setError('Please fill in required fields (First Name, Last Name, Phone Number).');
+        const validationError = validateProfile();
+        if (validationError) {
+            setError(validationError);
             setUpdating(false);
             return;
         }
@@ -103,7 +173,11 @@ export const useUserProfile = () => {
                 phone: profile.phone || '',
                 address: profile.address || '',
                 district: profile.district || '',
-                city: profile.city || ''
+                city: profile.city || '',
+                province: profile.province || '',
+                postalCode: profile.postalCode || '',
+                dateOfBirth: profile.dateOfBirth || '',
+                profileImage: profile.profileImage || ''
             });
         }
         setIsEditing(false);

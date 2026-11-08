@@ -1,16 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * AddressBookView Component
- * Dedicated full view for managing all customer delivery addresses.
+ * Dedicated full view for managing all customer delivery addresses,
+ * with clear error handling and rollback status reporting.
  */
 const AddressBookView = ({
     addresses,
+    error: propError,
     onAddClick,
     onEditAddress,
     onDeleteAddress,
     onSetDefault
 }) => {
+    const [actionError, setActionError] = useState(null);
+    const [busyId, setBusyId] = useState(null);
+
+    const handleSetDefault = async (id) => {
+        setActionError(null);
+        setBusyId(id);
+        try {
+            await onSetDefault(id);
+        } catch (err) {
+            setActionError(err.message || 'Failed to update default address.');
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        setActionError(null);
+        setBusyId(id);
+        try {
+            await onDeleteAddress(id);
+        } catch (err) {
+            setActionError(err.message || 'Failed to delete address.');
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    const displayError = actionError || propError;
+
     return (
         <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-sm space-y-6">
             {/* Header */}
@@ -31,6 +62,27 @@ const AddressBookView = ({
                 </button>
             </div>
 
+            {/* Error Notification */}
+            {displayError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{displayError}</span>
+                    </div>
+                    {actionError && (
+                        <button
+                            type="button"
+                            onClick={() => setActionError(null)}
+                            className="text-red-500 hover:text-red-800 font-bold ml-2 cursor-pointer"
+                        >
+                            &times;
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Address List */}
             {addresses.length === 0 ? (
                 <div className="py-12 text-center">
@@ -43,7 +95,7 @@ const AddressBookView = ({
                     <p className="text-xs text-gray-500 mb-4">Add your shipping address for quicker checkout.</p>
                     <button
                         onClick={onAddClick}
-                        className="text-xs font-semibold bg-black text-white px-4 py-2 rounded-xl"
+                        className="text-xs font-semibold bg-black text-white px-4 py-2 rounded-xl cursor-pointer"
                     >
                         Add Address
                     </button>
@@ -94,10 +146,11 @@ const AddressBookView = ({
                                 {!addr.isDefault ? (
                                     <button
                                         type="button"
-                                        onClick={() => onSetDefault(addr.id)}
-                                        className="text-gray-600 hover:text-black font-medium hover:underline cursor-pointer"
+                                        disabled={busyId === addr.id}
+                                        onClick={() => handleSetDefault(addr.id)}
+                                        className="text-gray-600 hover:text-black font-medium hover:underline cursor-pointer disabled:opacity-50"
                                     >
-                                        Set as default
+                                        {busyId === addr.id ? 'Setting...' : 'Set as default'}
                                     </button>
                                 ) : (
                                     <span className="text-emerald-600 font-medium text-[11px]">Primary delivery address</span>
@@ -106,6 +159,7 @@ const AddressBookView = ({
                                 <div className="flex items-center gap-3">
                                     <button
                                         type="button"
+                                        disabled={busyId === addr.id}
                                         onClick={() => onEditAddress(addr)}
                                         className="font-semibold text-gray-700 hover:text-black hover:underline cursor-pointer"
                                     >
@@ -113,10 +167,11 @@ const AddressBookView = ({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => onDeleteAddress(addr.id)}
-                                        className="font-semibold text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                                        disabled={busyId === addr.id}
+                                        onClick={() => handleDelete(addr.id)}
+                                        className="font-semibold text-red-500 hover:text-red-700 hover:underline cursor-pointer disabled:opacity-50"
                                     >
-                                        Delete
+                                        {busyId === addr.id ? 'Deleting...' : 'Delete'}
                                     </button>
                                 </div>
                             </div>

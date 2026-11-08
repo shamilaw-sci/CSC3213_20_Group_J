@@ -21,6 +21,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByUserIdAndCheckoutKey(Long userId, String checkoutKey);
     List<Order> findByUserId(Long userId);
+    List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     /**
      * Used by PromoCodeService to determine if a customer is "new"
