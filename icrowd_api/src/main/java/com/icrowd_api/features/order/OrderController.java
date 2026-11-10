@@ -27,15 +27,6 @@ public class OrderController {
 
     private final String UPLOAD_DIR = "uploads/";
 
-    @GetMapping("/my-orders")
-    public ResponseEntity<?> getMyOrders(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "UNAUTHORIZED", "message", "User must be authenticated."));
-        }
-        String email = authentication.getName();
-        return ResponseEntity.ok(orderService.getCustomerOrders(email));
-    }
-
     @PostMapping("/{id}/switch-to-cod")
     public ResponseEntity<?> switchToCod(@PathVariable Long id, Authentication authentication) {
         if (authentication == null) return ResponseEntity.status(401).build();

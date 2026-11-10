@@ -431,16 +431,20 @@ public class UserService {
 
     @Transactional
     public AddressDto addCustomerAddress(String email, AddressDto addressDto) {
-        Customer customer = customerRepository.findByUserEmailWithLock(email)
-                .orElseGet(() -> customerRepository.findByUserEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
+        Customer customer = customerRepository.findByUserEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
 
         List<Address> existingAddresses = addressRepository.findByCustomerId(customer.getId());
         boolean isFirst = existingAddresses.isEmpty();
         boolean shouldBeDefault = isFirst || Boolean.TRUE.equals(addressDto.getIsDefault());
 
         if (shouldBeDefault && !existingAddresses.isEmpty()) {
-            addressRepository.clearDefaultAddressesForCustomer(customer.getId());
+            for (Address a : existingAddresses) {
+                if (Boolean.TRUE.equals(a.getIsDefault())) {
+                    a.setIsDefault(false);
+                    addressRepository.save(a);
+                }
+            }
         }
 
         String recipient = addressDto.getRecipientName();
@@ -453,15 +457,13 @@ public class UserService {
             phone = customer.getPhone();
         }
 
-        String line1 = addressDto.getAddressLine1() != null && !addressDto.getAddressLine1().trim().isEmpty()
-                ? addressDto.getAddressLine1().trim()
-                : (addressDto.getAddress() != null ? addressDto.getAddress().trim() : "");
+        String line1 = addressDto.getAddressLine1() != null ? addressDto.getAddressLine1() : addressDto.getAddress();
 
         Address address = Address.builder()
                 .customer(customer)
                 .recipientName(recipient)
                 .phone(phone)
-                .addressLine1(line1)
+                .addressLine1(line1 != null ? line1.trim() : "")
                 .addressLine2(addressDto.getAddressLine2())
                 .city(addressDto.getCity() != null ? addressDto.getCity().trim() : "")
                 .district(addressDto.getDistrict())
@@ -480,51 +482,36 @@ public class UserService {
 
     @Transactional
     public AddressDto updateCustomerAddress(String email, Long addressId, AddressDto addressDto) {
-        Customer customer = customerRepository.findByUserEmailWithLock(email)
-                .orElseGet(() -> customerRepository.findByUserEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
+        Customer customer = customerRepository.findByUserEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
 
         Address address = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
 
-        if (Boolean.TRUE.equals(addressDto.getIsDefault())) {
-            addressRepository.clearDefaultAddressesForCustomer(customer.getId());
-            address.setIsDefault(true);
-        } else if (Boolean.FALSE.equals(addressDto.getIsDefault()) && Boolean.TRUE.equals(address.getIsDefault())) {
-            List<Address> others = addressRepository.findByCustomerId(customer.getId()).stream()
-                    .filter(a -> !a.getId().equals(addressId))
-                    .collect(Collectors.toList());
-            if (!others.isEmpty()) {
-                address.setIsDefault(false);
-                Address newDefault = others.get(0);
-                newDefault.setIsDefault(true);
-                addressRepository.save(newDefault);
-            } else {
-                address.setIsDefault(true);
+        if (Boolean.TRUE.equals(addressDto.getIsDefault()) && !Boolean.TRUE.equals(address.getIsDefault())) {
+            List<Address> existing = addressRepository.findByCustomerId(customer.getId());
+            for (Address a : existing) {
+                if (Boolean.TRUE.equals(a.getIsDefault())) {
+                    a.setIsDefault(false);
+                    addressRepository.save(a);
+                }
             }
+            address.setIsDefault(true);
         }
 
-        if (addressDto.getRecipientName() != null && !addressDto.getRecipientName().trim().isEmpty()) {
-            address.setRecipientName(addressDto.getRecipientName().trim());
-        }
-        if (addressDto.getPhone() != null && !addressDto.getPhone().trim().isEmpty()) {
-            address.setPhone(addressDto.getPhone().trim());
-        }
+        if (addressDto.getRecipientName() != null) address.setRecipientName(addressDto.getRecipientName());
+        if (addressDto.getPhone() != null) address.setPhone(addressDto.getPhone());
 
-        String line1 = addressDto.getAddressLine1() != null && !addressDto.getAddressLine1().trim().isEmpty()
-                ? addressDto.getAddressLine1().trim()
-                : (addressDto.getAddress() != null ? addressDto.getAddress().trim() : null);
-        if (line1 != null) {
-            address.setAddressLine1(line1);
-        }
+        String line1 = addressDto.getAddressLine1() != null ? addressDto.getAddressLine1() : addressDto.getAddress();
+        if (line1 != null) address.setAddressLine1(line1.trim());
 
-        if (addressDto.getAddressLine2() != null) address.setAddressLine2(addressDto.getAddressLine2().trim());
-        if (addressDto.getCity() != null && !addressDto.getCity().trim().isEmpty()) address.setCity(addressDto.getCity().trim());
-        if (addressDto.getDistrict() != null) address.setDistrict(addressDto.getDistrict().trim());
-        if (addressDto.getProvince() != null) address.setProvince(addressDto.getProvince().trim());
-        if (addressDto.getPostalCode() != null) address.setPostalCode(addressDto.getPostalCode().trim());
-        if (addressDto.getCountry() != null) address.setCountry(addressDto.getCountry().trim());
-        if (addressDto.getLabel() != null) address.setAddressType(addressDto.getLabel().trim());
+        if (addressDto.getAddressLine2() != null) address.setAddressLine2(addressDto.getAddressLine2());
+        if (addressDto.getCity() != null) address.setCity(addressDto.getCity().trim());
+        if (addressDto.getDistrict() != null) address.setDistrict(addressDto.getDistrict());
+        if (addressDto.getProvince() != null) address.setProvince(addressDto.getProvince());
+        if (addressDto.getPostalCode() != null) address.setPostalCode(addressDto.getPostalCode());
+        if (addressDto.getCountry() != null) address.setCountry(addressDto.getCountry());
+        if (addressDto.getLabel() != null) address.setAddressType(addressDto.getLabel());
         if (addressDto.getLatitude() != null) address.setLatitude(addressDto.getLatitude());
         if (addressDto.getLongitude() != null) address.setLongitude(addressDto.getLongitude());
 
@@ -534,9 +521,8 @@ public class UserService {
 
     @Transactional
     public void deleteCustomerAddress(String email, Long addressId) {
-        Customer customer = customerRepository.findByUserEmailWithLock(email)
-                .orElseGet(() -> customerRepository.findByUserEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
+        Customer customer = customerRepository.findByUserEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
 
         Address address = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
@@ -556,17 +542,18 @@ public class UserService {
 
     @Transactional
     public AddressDto setDefaultCustomerAddress(String email, Long addressId) {
-        Customer customer = customerRepository.findByUserEmailWithLock(email)
-                .orElseGet(() -> customerRepository.findByUserEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
+        Customer customer = customerRepository.findByUserEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
 
         Address targetAddress = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
 
-        addressRepository.clearDefaultAddressesForCustomer(customer.getId());
-        targetAddress.setIsDefault(true);
-        Address saved = addressRepository.save(targetAddress);
+        List<Address> allAddresses = addressRepository.findByCustomerId(customer.getId());
+        for (Address a : allAddresses) {
+            a.setIsDefault(a.getId().equals(addressId));
+            addressRepository.save(a);
+        }
 
-        return AddressDto.fromEntity(saved);
+        return AddressDto.fromEntity(targetAddress);
     }
 }
