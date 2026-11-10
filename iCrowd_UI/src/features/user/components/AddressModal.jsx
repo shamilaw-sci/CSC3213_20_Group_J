@@ -3,9 +3,7 @@ import InteractiveMapPicker from './InteractiveMapPicker';
 
 /**
  * AddressModal Component
- * Form modal for adding or editing a delivery address with interactive map picker,
- * comprehensive validation (phone, field lengths, coordinates),
- * and clear error display upon backend failure.
+ * Form modal for adding or editing a delivery address with an interactive map picker.
  */
 const AddressModal = ({
     isOpen,
@@ -28,8 +26,6 @@ const AddressModal = ({
     });
 
     const [errors, setErrors] = useState({});
-    const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState(null);
 
     useEffect(() => {
         if (addressToEdit) {
@@ -62,70 +58,16 @@ const AddressModal = ({
             });
         }
         setErrors({});
-        setSubmitError(null);
-        setSubmitting(false);
     }, [addressToEdit, isOpen]);
 
     if (!isOpen) return null;
 
     const validate = () => {
         const newErrors = {};
-
-        // Recipient Name validation
-        const trimmedName = formData.recipientName.trim();
-        if (!trimmedName) {
-            newErrors.recipientName = 'Recipient name is required';
-        } else if (trimmedName.length > 100) {
-            newErrors.recipientName = 'Recipient name must not exceed 100 characters';
-        }
-
-        // Phone validation
-        const cleanPhone = formData.phone.trim().replace(/[\s-]/g, '');
-        if (!cleanPhone) {
-            newErrors.phone = 'Mobile number is required';
-        } else if (!/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
-            newErrors.phone = 'Invalid phone number. Must contain 7 to 15 digits (e.g. +94771234567)';
-        }
-
-        // Address validation
-        const trimmedAddress = formData.address.trim();
-        if (!trimmedAddress) {
-            newErrors.address = 'Street address is required';
-        } else if (trimmedAddress.length > 255) {
-            newErrors.address = 'Street address must not exceed 255 characters';
-        }
-
-        // City validation
-        const trimmedCity = formData.city.trim();
-        if (!trimmedCity) {
-            newErrors.city = 'City is required';
-        } else if (trimmedCity.length > 100) {
-            newErrors.city = 'City must not exceed 100 characters';
-        }
-
-        // Postal code validation (optional but format check)
-        if (formData.postalCode && formData.postalCode.trim()) {
-            if (formData.postalCode.trim().length > 20) {
-                newErrors.postalCode = 'Postal code must not exceed 20 characters';
-            } else if (!/^[0-9A-Za-z -]{0,20}$/.test(formData.postalCode.trim())) {
-                newErrors.postalCode = 'Invalid postal code format';
-            }
-        }
-
-        // Coordinates validation
-        if (formData.latitude != null) {
-            const lat = Number(formData.latitude);
-            if (isNaN(lat) || lat < -90 || lat > 90) {
-                newErrors.coordinates = 'Latitude must be between -90 and 90';
-            }
-        }
-        if (formData.longitude != null) {
-            const lng = Number(formData.longitude);
-            if (isNaN(lng) || lng < -180 || lng > 180) {
-                newErrors.coordinates = 'Longitude must be between -180 and 180';
-            }
-        }
-
+        if (!formData.recipientName.trim()) newErrors.recipientName = 'Recipient name is required';
+        if (!formData.phone.trim()) newErrors.phone = 'Mobile number is required';
+        if (!formData.address.trim()) newErrors.address = 'Street address is required';
+        if (!formData.city.trim()) newErrors.city = 'City is required';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -139,7 +81,6 @@ const AddressModal = ({
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: null }));
         }
-        if (submitError) setSubmitError(null);
     };
 
     const handleCoordinatesChange = (lat, lng) => {
@@ -148,25 +89,13 @@ const AddressModal = ({
             latitude: parseFloat(lat),
             longitude: parseFloat(lng)
         }));
-        if (errors.coordinates) {
-            setErrors(prev => ({ ...prev, coordinates: null }));
-        }
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        setSubmitError(null);
         if (!validate()) return;
-
-        setSubmitting(true);
-        try {
-            await onSave(formData);
-            onClose();
-        } catch (err) {
-            setSubmitError(err.response?.data?.message || err.message || 'Failed to save address. Please check your details.');
-        } finally {
-            setSubmitting(false);
-        }
+        onSave(formData);
+        onClose();
     };
 
     return (
@@ -183,8 +112,7 @@ const AddressModal = ({
                     </h3>
                     <button
                         onClick={onClose}
-                        disabled={submitting}
-                        className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-200/60 transition-colors cursor-pointer"
+                        className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-200/60 transition-colors"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -194,16 +122,6 @@ const AddressModal = ({
 
                 {/* Form Body */}
                 <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
-                    {/* Error Banner */}
-                    {submitError && (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium flex items-center gap-2">
-                            <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>{submitError}</span>
-                        </div>
-                    )}
-
                     {/* Label & Recipient Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -216,7 +134,7 @@ const AddressModal = ({
                                         key={type}
                                         type="button"
                                         onClick={() => setFormData(prev => ({ ...prev, label: type }))}
-                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                                             formData.label === type
                                                 ? 'bg-black text-white border-black shadow-sm'
                                                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
@@ -235,7 +153,6 @@ const AddressModal = ({
                             <input
                                 type="text"
                                 name="recipientName"
-                                maxLength={100}
                                 value={formData.recipientName}
                                 onChange={handleChange}
                                 placeholder="e.g. John Silva"
@@ -258,7 +175,6 @@ const AddressModal = ({
                             <input
                                 type="text"
                                 name="phone"
-                                maxLength={20}
                                 value={formData.phone}
                                 onChange={handleChange}
                                 placeholder="e.g. +94 77 123 4567"
@@ -278,7 +194,6 @@ const AddressModal = ({
                             <input
                                 type="text"
                                 name="address"
-                                maxLength={255}
                                 value={formData.address}
                                 onChange={handleChange}
                                 placeholder="e.g. 123 Main Street"
@@ -301,7 +216,6 @@ const AddressModal = ({
                             <input
                                 type="text"
                                 name="city"
-                                maxLength={100}
                                 value={formData.city}
                                 onChange={handleChange}
                                 placeholder="e.g. Colombo"
@@ -309,9 +223,6 @@ const AddressModal = ({
                                     errors.city ? 'border-red-400 bg-red-50/40' : 'border-gray-300 bg-white'
                                 }`}
                             />
-                            {errors.city && (
-                                <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                            )}
                         </div>
 
                         <div>
@@ -362,17 +273,12 @@ const AddressModal = ({
                             <input
                                 type="text"
                                 name="postalCode"
-                                maxLength={20}
                                 value={formData.postalCode}
                                 onChange={handleChange}
                                 placeholder="00300"
-                                className={`w-full px-3 py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black ${
-                                    errors.postalCode ? 'border-red-400 bg-red-50/40' : 'border-gray-300'
-                                }`}
-                            />
-                            {errors.postalCode && (
-                                <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
-                            )}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black"
+                            >
+                            </input>
                         </div>
                     </div>
 
@@ -386,9 +292,6 @@ const AddressModal = ({
                             longitude={formData.longitude}
                             onChange={handleCoordinatesChange}
                         />
-                        {errors.coordinates && (
-                            <p className="text-red-500 text-xs mt-1">{errors.coordinates}</p>
-                        )}
                     </div>
 
                     {/* Default Address Checkbox */}
@@ -411,17 +314,15 @@ const AddressModal = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            disabled={submitting}
-                            className="px-5 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                            className="px-5 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            disabled={submitting}
-                            className="px-6 py-2 rounded-xl text-sm font-semibold bg-black text-white hover:bg-gray-800 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
+                            className="px-6 py-2 rounded-xl text-sm font-semibold bg-black text-white hover:bg-gray-800 transition-all shadow-md active:scale-95"
                         >
-                            {submitting ? 'Saving Address...' : 'Save Address'}
+                            Save Address
                         </button>
                     </div>
                 </form>

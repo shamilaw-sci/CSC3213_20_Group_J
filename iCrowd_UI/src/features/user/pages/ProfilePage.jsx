@@ -36,7 +36,6 @@ const ProfilePage = () => {
     const {
         addresses,
         defaultAddress,
-        error: addressError,
         addAddress,
         updateAddress,
         deleteAddress,
@@ -57,11 +56,11 @@ const ProfilePage = () => {
         setIsAddressModalOpen(true);
     };
 
-    const handleSaveAddress = async (addressData) => {
+    const handleSaveAddress = (addressData) => {
         if (editingAddress) {
-            await updateAddress(editingAddress.id, addressData);
+            updateAddress(editingAddress.id, addressData);
         } else {
-            await addAddress(addressData);
+            addAddress(addressData);
         }
     };
 
@@ -182,7 +181,6 @@ const ProfilePage = () => {
 
                                 <AddressBookView
                                     addresses={addresses}
-                                    error={addressError}
                                     onAddClick={handleOpenAddAddress}
                                     onEditAddress={handleOpenEditAddress}
                                     onDeleteAddress={deleteAddress}
