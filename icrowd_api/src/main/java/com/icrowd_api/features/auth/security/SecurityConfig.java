@@ -77,8 +77,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
                 // User profile and address endpoints require authentication
                 .requestMatchers("/api/users/**").authenticated()
-                // Cart, order, and wishlist endpoints require authentication
-                .requestMatchers("/api/cart/**", "/api/orders/**", "/api/wishlist/**").authenticated()
+                // Cart and order endpoints require authentication
+                .requestMatchers("/api/cart/**", "/api/orders/**").authenticated()
                 // Gateway payment notification callback is public (server-to-server)
                 .requestMatchers(HttpMethod.POST, "/api/payments/notify").permitAll()
                 // All other payment endpoints require authentication

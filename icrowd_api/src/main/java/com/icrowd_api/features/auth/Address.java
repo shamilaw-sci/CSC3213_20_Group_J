@@ -29,38 +29,30 @@ public class Address {
     @JsonIgnore
     private Customer customer;
 
-    @Column(length = 100)
     private String recipientName;
 
-    @Column(length = 20)
     private String phone;
 
     @NotBlank(message = "Address line 1 is required")
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String addressLine1;
 
-    @Column(length = 255)
     private String addressLine2;
 
     @NotBlank(message = "City is required")
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false)
     private String city;
 
-    @Column(length = 100)
     private String district;
 
-    @Column(length = 100)
     private String province;
 
-    @Column(length = 20)
     private String postalCode;
 
     @Builder.Default
-    @Column(length = 100)
     private String country = "Sri Lanka";
 
     @Builder.Default
-    @Column(length = 50)
     private String addressType = "HOME"; // HOME, WORK, OFFICE, OTHER, etc.
 
     @Builder.Default

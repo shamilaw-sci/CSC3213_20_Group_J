@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     fetchUserAddresses,
     createUserAddress,
@@ -10,16 +10,12 @@ import {
 /**
  * Custom Hook: useAddressBook
  * Manages customer delivery addresses with backend integration,
- * multiple address support, default address management, atomic rollback on failure,
- * and security cleanup on logout/account switch.
+ * multiple address support, set default, add, edit, and delete operations.
  */
 export const useAddressBook = (user) => {
-    const userIdentifier = user ? (user.id || user.email) : null;
-    const storageKey = userIdentifier ? `user_addresses_${userIdentifier}` : null;
-    const prevUserRef = useRef(userIdentifier);
+    const storageKey = user ? `user_addresses_${user.id || user.email}` : 'user_addresses_default';
 
     const [addresses, setAddresses] = useState(() => {
-        if (!userIdentifier || !storageKey) return [];
         try {
             const saved = localStorage.getItem(storageKey);
             if (saved) {
@@ -28,79 +24,66 @@ export const useAddressBook = (user) => {
         } catch (e) {
             console.error("Failed to load saved addresses", e);
         }
+
+        if (user && (user.address || user.city)) {
+            return [
+                {
+                    id: 'addr-default',
+                    label: 'Home',
+                    recipientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Valued Customer',
+                    phone: user.phone || '+94 77 123 4567',
+                    address: user.address || '123 Galle Road',
+                    city: user.city || 'Colombo 03',
+                    district: user.district || 'Colombo',
+                    province: 'Western Province',
+                    postalCode: '00300',
+                    latitude: 6.9034,
+                    longitude: 79.8546,
+                    isDefault: true
+                }
+            ];
+        }
+
         return [];
     });
 
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    // Reset state and wipe storage when user logs out or switches accounts
-    useEffect(() => {
-        if (prevUserRef.current !== userIdentifier) {
-            if (!userIdentifier) {
-                setAddresses([]);
-                if (storageKey) {
-                    try {
-                        localStorage.removeItem(storageKey);
-                    } catch (e) {
-                        // ignore storage errors
-                    }
-                }
-            } else {
-                setAddresses([]);
-            }
-            prevUserRef.current = userIdentifier;
-            setError(null);
-        }
-    }, [userIdentifier, storageKey]);
 
     const loadAddresses = useCallback(async () => {
         const token = localStorage.getItem('token');
-        if (!token || !userIdentifier) {
-            setAddresses([]);
-            return;
-        }
+        if (!token) return;
 
         setLoading(true);
-        setError(null);
         try {
             const backendAddresses = await fetchUserAddresses();
             if (Array.isArray(backendAddresses)) {
                 setAddresses(backendAddresses);
-                if (storageKey) {
-                    localStorage.setItem(storageKey, JSON.stringify(backendAddresses));
-                }
+                localStorage.setItem(storageKey, JSON.stringify(backendAddresses));
             }
         } catch (err) {
-            console.warn("Could not fetch addresses from backend:", err?.message);
+            console.warn("Could not fetch addresses from backend, using local state:", err?.message);
         } finally {
             setLoading(false);
         }
-    }, [userIdentifier, storageKey]);
+    }, [storageKey]);
 
     useEffect(() => {
-        if (userIdentifier) {
-            loadAddresses();
-        }
-    }, [userIdentifier, loadAddresses]);
+        loadAddresses();
+    }, [loadAddresses]);
 
-    // Save to localStorage whenever addresses change and user is logged in
+    // Save to localStorage whenever addresses change
     useEffect(() => {
-        if (!userIdentifier || !storageKey) return;
-        try {
-            if (addresses.length > 0) {
+        if (addresses.length > 0) {
+            try {
                 localStorage.setItem(storageKey, JSON.stringify(addresses));
-            } else {
-                localStorage.removeItem(storageKey);
+            } catch (e) {
+                console.error("Failed to save addresses", e);
             }
-        } catch (e) {
-            console.error("Failed to persist addresses", e);
         }
-    }, [addresses, userIdentifier, storageKey]);
+    }, [addresses, storageKey]);
 
     const addAddress = async (newAddr) => {
-        setError(null);
-        const previousSnapshot = [...addresses];
+        // Optimistic UI update
         const tempId = 'temp_' + Date.now();
         const addressToAdd = {
             ...newAddr,
@@ -108,7 +91,6 @@ export const useAddressBook = (user) => {
             isDefault: addresses.length === 0 || newAddr.isDefault
         };
 
-        // Optimistic UI update
         setAddresses(prev => {
             if (addressToAdd.isDefault) {
                 return [
@@ -126,21 +108,13 @@ export const useAddressBook = (user) => {
                 setAddresses(prev => prev.map(a => a.id === tempId ? saved : a));
                 return saved;
             }
-            throw new Error("Invalid address received from server");
         } catch (err) {
-            // Roll back optimistic changes immediately
-            setAddresses(previousSnapshot);
-            const errorMsg = err.response?.data?.message || err.message || 'Failed to save address';
-            setError(errorMsg);
-            throw new Error(errorMsg);
+            console.warn("Backend add address failed, kept in local state:", err?.message);
         }
+        return addressToAdd;
     };
 
     const updateAddress = async (id, updatedData) => {
-        setError(null);
-        const previousSnapshot = [...addresses];
-
-        // Optimistic UI update
         setAddresses(prev => {
             return prev.map(a => {
                 if (a.id === id) {
@@ -153,30 +127,21 @@ export const useAddressBook = (user) => {
             });
         });
 
+        // Only call backend if id is a valid backend ID (numeric or long)
         if (id && !String(id).startsWith('temp_') && !String(id).startsWith('addr-')) {
             try {
                 const res = await updateUserAddress(id, updatedData);
                 const updated = res.address || res;
                 if (updated) {
                     setAddresses(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
-                    return updated;
                 }
-                throw new Error("Invalid address update response");
             } catch (err) {
-                // Roll back optimistic changes
-                setAddresses(previousSnapshot);
-                const errorMsg = err.response?.data?.message || err.message || 'Failed to update address';
-                setError(errorMsg);
-                throw new Error(errorMsg);
+                console.warn("Backend update address failed:", err?.message);
             }
         }
     };
 
     const deleteAddress = async (id) => {
-        setError(null);
-        const previousSnapshot = [...addresses];
-
-        // Optimistic UI update
         setAddresses(prev => {
             const filtered = prev.filter(a => a.id !== id);
             if (filtered.length > 0 && !filtered.some(a => a.isDefault)) {
@@ -189,20 +154,12 @@ export const useAddressBook = (user) => {
             try {
                 await deleteUserAddress(id);
             } catch (err) {
-                // Roll back optimistic changes
-                setAddresses(previousSnapshot);
-                const errorMsg = err.response?.data?.message || err.message || 'Failed to delete address';
-                setError(errorMsg);
-                throw new Error(errorMsg);
+                console.warn("Backend delete address failed:", err?.message);
             }
         }
     };
 
     const setDefaultAddress = async (id) => {
-        setError(null);
-        const previousSnapshot = [...addresses];
-
-        // Optimistic UI update
         setAddresses(prev =>
             prev.map(a => ({
                 ...a,
@@ -212,20 +169,9 @@ export const useAddressBook = (user) => {
 
         if (id && !String(id).startsWith('temp_') && !String(id).startsWith('addr-')) {
             try {
-                const res = await setDefaultUserAddress(id);
-                const updated = res.address || res;
-                if (updated) {
-                    setAddresses(prev => prev.map(a => ({
-                        ...a,
-                        isDefault: a.id === id
-                    })));
-                }
+                await setDefaultUserAddress(id);
             } catch (err) {
-                // Roll back optimistic changes
-                setAddresses(previousSnapshot);
-                const errorMsg = err.response?.data?.message || err.message || 'Failed to set default address';
-                setError(errorMsg);
-                throw new Error(errorMsg);
+                console.warn("Backend set default address failed:", err?.message);
             }
         }
     };
@@ -236,8 +182,6 @@ export const useAddressBook = (user) => {
         addresses,
         defaultAddress,
         loading,
-        error,
-        clearError: () => setError(null),
         addAddress,
         updateAddress,
         deleteAddress,
