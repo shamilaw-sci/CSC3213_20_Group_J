@@ -7,6 +7,7 @@ icrowd_api/target/
 icrowd_api/bin/
 icrowd_api/.settings/
 icrowd_api/.metadata/
+icrowd_api/uploads/
 *.class
 *.jar
 

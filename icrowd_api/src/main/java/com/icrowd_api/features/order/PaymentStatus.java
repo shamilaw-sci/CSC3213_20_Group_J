@@ -2,11 +2,12 @@ package com.icrowd_api.features.order;
 
 public enum PaymentStatus {
     PENDING,
-    REFUND_PENDING,
-    REFUNDED,
     INITIATED,
     SUCCESS,
+    PAID,
+    DUE_ON_DELIVERY,
     FAILED,
     CANCELLED,
-    DUE_ON_DELIVERY
+    REFUND_PENDING,
+    REFUNDED
 }

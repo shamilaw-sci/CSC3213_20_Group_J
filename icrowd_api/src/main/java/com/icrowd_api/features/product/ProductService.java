@@ -1,11 +1,13 @@
 package com.icrowd_api.features.product;
 
+import com.icrowd_api.features.audit.AuditService;
 import com.icrowd_api.features.auth.UserRepository;
 import com.icrowd_api.features.cart.CartRepository;
 import com.icrowd_api.features.category.Category;
 import com.icrowd_api.features.category.CategoryRepository;
 import com.icrowd_api.features.order.OrderItemRepository;
 import com.icrowd_api.features.order.OrderRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,14 +15,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,19 +29,30 @@ public class ProductService {
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
-    public ProductService(ProductRepository productRepository, 
+    @Autowired
+    public ProductService(ProductRepository productRepository,
                           CategoryRepository categoryRepository,
                           OrderRepository orderRepository,
                           OrderItemRepository orderItemRepository,
                           CartRepository cartRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          AuditService auditService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
         this.userRepository = userRepository;
+        this.auditService = auditService;
+    }
+
+    // Convenience constructor for tests with only core repositories
+    public ProductService(ProductRepository productRepository,
+                          CategoryRepository categoryRepository,
+                          AuditService auditService) {
+        this(productRepository, categoryRepository, null, null, null, null, auditService);
     }
 
     // ── Customer-facing ────────────────────────────────────────────────────────
@@ -121,7 +129,9 @@ public class ProductService {
         LevenshteinDistance distance = new LevenshteinDistance();
 
         List<String> terms = allProducts.stream()
-                .map(Product::getName).distinct()
+                .map(p -> p != null ? p.getName() : "")
+                .filter(name -> name != null && !name.isEmpty())
+                .distinct()
                 .filter(name -> {
                     String lowerName = name.toLowerCase();
                     if (lowerName.contains(searchKey)) return true;
@@ -141,7 +151,9 @@ public class ProductService {
                 .limit(5).collect(Collectors.toList());
 
         List<String> categories = allProducts.stream()
-                .map(p -> p.getCategory().getName()).distinct()
+                .map(p -> (p != null && p.getCategory() != null) ? p.getCategory().getName() : "")
+                .filter(cat -> cat != null && !cat.isEmpty())
+                .distinct()
                 .filter(cat -> {
                     String lowerCat = cat.toLowerCase();
                     if (lowerCat.contains(searchKey)) return true;
@@ -186,7 +198,7 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
     }
 
-    public Product createProduct(ProductRequest request) {
+    public Product createProduct(ProductRequest request, String actorEmail) {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + request.categoryId()));
 
@@ -202,10 +214,22 @@ public class ProductService {
                 .isActive(request.isActive() != null ? request.isActive() : true)
                 .build();
 
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+        if (auditService != null) {
+            auditService.log(actorEmail, "PRODUCT_CREATED", "PRODUCT", saved.getId(),
+                    "Created product '" + saved.getName() + "' SKU=" + saved.getSku()
+                            + " price=" + saved.getPrice() + " stock=" + saved.getAvailableStock());
+        }
+        return saved;
     }
 
-    public Product updateProduct(Long id, ProductRequest request) {
+    /** @deprecated Use {@link #createProduct(ProductRequest, String)} with actorEmail. */
+    @Deprecated
+    public Product createProduct(ProductRequest request) {
+        return createProduct(request, "SYSTEM");
+    }
+
+    public Product updateProduct(Long id, ProductRequest request, String actorEmail) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -216,14 +240,39 @@ public class ProductService {
         }
         if (request.name() != null) product.setName(request.name());
         if (request.description() != null) product.setDescription(request.description());
-        if (request.price() != null) product.setPrice(request.price());
-        if (request.availableStock() != null) product.setAvailableStock(request.availableStock());
+
+        // Audit price change
+        if (request.price() != null && !request.price().equals(product.getPrice())) {
+            BigDecimal oldPrice = product.getPrice();
+            product.setPrice(request.price());
+            if (auditService != null) {
+                auditService.log(actorEmail, "PRICE_CHANGE", "PRODUCT", product.getId(),
+                        "Price changed for '" + product.getName() + "': " + oldPrice + " -> " + request.price());
+            }
+        }
+
+        // Audit stock adjustment
+        if (request.availableStock() != null && !request.availableStock().equals(product.getAvailableStock())) {
+            int oldStock = product.getAvailableStock();
+            product.setAvailableStock(request.availableStock());
+            if (auditService != null) {
+                auditService.log(actorEmail, "STOCK_ADJUSTMENT", "PRODUCT", product.getId(),
+                        "Stock adjusted for '" + product.getName() + "': " + oldStock + " -> " + request.availableStock());
+            }
+        }
+
         if (request.imageUrls() != null) product.setImageUrls(request.imageUrls());
         if (request.tags() != null) product.setTags(request.tags());
         if (request.isActive() != null) product.setIsActive(request.isActive());
         if (request.sku() != null) product.setSku(request.sku());
 
         return productRepository.save(product);
+    }
+
+    /** @deprecated Use {@link #updateProduct(Long, ProductRequest, String)} with actorEmail. */
+    @Deprecated
+    public Product updateProduct(Long id, ProductRequest request) {
+        return updateProduct(id, request, "SYSTEM");
     }
 
     public void softDeleteProduct(Long id) {
@@ -251,17 +300,17 @@ public class ProductService {
     }
 
     // ── Recommendations ────────────────────────────────────────────────────────
-    
+
     public List<Product> getRecommendedProducts(String userEmail, int limit) {
         List<Product> recommendations = new ArrayList<>();
-        
+
         // 1. Personalized Recommendations (if user is authenticated)
-        if (userEmail != null) {
+        if (userEmail != null && userRepository != null && orderRepository != null && cartRepository != null) {
             userRepository.findByEmail(userEmail).ifPresent(user -> {
                 Set<Long> favoriteCategoryIds = new HashSet<>();
                 favoriteCategoryIds.addAll(orderRepository.findUserPurchasedCategoryIds(user.getId()));
                 favoriteCategoryIds.addAll(cartRepository.findUserCartCategoryIds(user.getId()));
-                
+
                 if (!favoriteCategoryIds.isEmpty()) {
                     int personalizedLimit = limit / 2; // 50% personalized
                     recommendations.addAll(productRepository.findTopProductsByCategories(
@@ -269,29 +318,28 @@ public class ProductService {
                 }
             });
         }
-        
+
         // 2. Trending Products (Last 30 days)
         int remainingLimit = limit - recommendations.size();
-        if (remainingLimit > 0) {
+        if (remainingLimit > 0 && orderItemRepository != null) {
             LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
             List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, remainingLimit * 2));
-            
+
             Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
                     .filter(Product::getIsActive)
                     .collect(Collectors.toMap(Product::getId, p -> p));
-            
+
             List<Product> trendingProducts = new ArrayList<>();
             for (Long id : topSellingIds) {
                 if (productMap.containsKey(id)) {
                     trendingProducts.add(productMap.get(id));
                 }
             }
-                    
+
             recommendations.addAll(trendingProducts);
         }
-        
-        // 3. Fallback: If still under limit (e.g., brand-new site with few/no orders yet),
-        // fill with highest-rated and newest active products
+
+        // 3. Fallback: If still under limit, fill with highest-rated and newest active products
         if (recommendations.size() < limit) {
             Page<Product> fallbackPage = productRepository.findByIsActiveTrue(
                     PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
@@ -305,24 +353,27 @@ public class ProductService {
                 }
             }
         }
-        
+
         // Return exactly 'limit' distinct products
         return recommendations.stream().distinct().limit(limit).collect(Collectors.toList());
     }
 
     public List<Product> getFeaturedProducts(int limit) {
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
-        List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, limit * 2));
-
         List<Product> featured = new ArrayList<>();
-        if (!topSellingIds.isEmpty()) {
-            Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
-                    .filter(Product::getIsActive)
-                    .collect(Collectors.toMap(Product::getId, p -> p));
 
-            for (Long id : topSellingIds) {
-                if (productMap.containsKey(id)) {
-                    featured.add(productMap.get(id));
+        if (orderItemRepository != null) {
+            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+            List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, limit * 2));
+
+            if (!topSellingIds.isEmpty()) {
+                Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
+                        .filter(Product::getIsActive)
+                        .collect(Collectors.toMap(Product::getId, p -> p));
+
+                for (Long id : topSellingIds) {
+                    if (productMap.containsKey(id)) {
+                        featured.add(productMap.get(id));
+                    }
                 }
             }
         }

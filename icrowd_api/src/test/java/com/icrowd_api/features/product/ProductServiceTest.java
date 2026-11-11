@@ -40,6 +40,8 @@ public class ProductServiceTest {
     private CartRepository cartRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private com.icrowd_api.features.audit.AuditService auditService;
 
     @InjectMocks
     private ProductService productService;

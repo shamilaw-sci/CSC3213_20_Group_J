@@ -107,6 +107,47 @@ public class PromoCodeService {
                 .collect(Collectors.toList());
     }
 
+    // ── Customer-facing: Available Promotions ──────────────────────────────────
+
+    /**
+     * Retrieves all currently active and valid promo codes that a customer is eligible for.
+     */
+    public List<PromoCodeResponse> getAvailablePromotions(String userEmail) {
+        LocalDate today = LocalDate.now();
+        List<PromoCode> all = promoCodeRepository.findAll();
+        User user = (userEmail != null && !userEmail.trim().isEmpty())
+                ? userRepository.findByEmail(userEmail).orElse(null)
+                : null;
+
+        return all.stream()
+                .filter(p -> Boolean.TRUE.equals(p.getActive()))
+                .filter(p -> p.getStartDate() == null || !p.getStartDate().isAfter(today))
+                .filter(p -> p.getExpiryDate() == null || !p.getExpiryDate().isBefore(today))
+                .filter(p -> p.getTotalUsageLimit() == null || promoCodeUsageRepository.countConfirmedByPromoCode(p) < p.getTotalUsageLimit())
+                .filter(p -> {
+                    // Check customer eligibility
+                    if (p.getCustomerEligibility() == CustomerEligibility.NEW_CUSTOMERS) {
+                        if (user != null) {
+                            long completedOrders = orderRepository.countCompletedOrdersByUserId(user.getId());
+                            if (completedOrders > 0) return false;
+                        }
+                    } else if (p.getCustomerEligibility() == CustomerEligibility.SELECTED_CUSTOMERS) {
+                        if (userEmail == null || p.getEligibleCustomerEmails() == null ||
+                                p.getEligibleCustomerEmails().stream().noneMatch(e -> e.equalsIgnoreCase(userEmail))) {
+                            return false;
+                        }
+                    }
+                    // Check per customer limit
+                    if (user != null && p.getPerCustomerLimit() != null) {
+                        long usedByCustomer = promoCodeUsageRepository.countByPromoCodeAndCustomer(p, user);
+                        if (usedByCustomer >= p.getPerCustomerLimit()) return false;
+                    }
+                    return true;
+                })
+                .map(PromoCodeResponse::from)
+                .collect(Collectors.toList());
+    }
+
     public PromoStatsResponse getPromoStats() {
         long active = promoCodeRepository.countByActiveTrue();
         long expired = promoCodeRepository.countExpired();
@@ -152,7 +193,8 @@ public class PromoCodeService {
         if (promo.getExpiryDate() != null && promo.getExpiryDate().isBefore(today)) {
             return fail("This promo code has expired.");
         }
-        if (promo.getTotalUsageLimit() != null && promo.getUsageCount() >= promo.getTotalUsageLimit()) {
+        long confirmedUsages = promoCodeUsageRepository.countConfirmedByPromoCode(promo);
+        if (promo.getTotalUsageLimit() != null && confirmedUsages >= promo.getTotalUsageLimit()) {
             return fail("This promo code has reached its usage limit.");
         }
         if (promo.getMinimumOrderAmount() != null

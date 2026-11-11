@@ -1,11 +1,15 @@
 package com.icrowd_api.features.auth;
 
+import com.icrowd_api.features.audit.AuditService;
 import com.icrowd_api.features.auth.dto.AddressDto;
+import com.icrowd_api.features.auth.dto.AdminUserSummaryDto;
 import com.icrowd_api.features.auth.dto.ChangePasswordRequest;
 import com.icrowd_api.features.auth.dto.RegisterRequest;
 import com.icrowd_api.features.auth.dto.UpdateProfileRequest;
 import com.icrowd_api.features.auth.dto.UserProfileResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,9 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AuditService auditService;
+
     @Transactional
     public String registerUser(RegisterRequest request) {
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
@@ -40,63 +47,83 @@ public class UserService {
             return "Email already exists!";
         }
 
-        String role = (request.getRole() != null && request.getRole().equalsIgnoreCase("ADMIN"))
-                ? "ADMIN"
-                : "CUSTOMER";
+        // Security: Public registration MUST ALWAYS assign CUSTOMER role
+        String role = "CUSTOMER";
 
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .accountStatus("ACTIVE")
+                .tokenVersion(1L)
                 .build();
 
-        if ("ADMIN".equals(role)) {
-            Admin admin = Admin.builder()
-                    .user(user)
-                    .firstName(request.getFirstName())
-                    .lastName(request.getLastName())
+        Customer customer = Customer.builder()
+                .user(user)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phone(request.getPhone())
+                .dateOfBirth(request.getDateOfBirth())
+                .profileImage(request.getProfileImage())
+                .addresses(new ArrayList<>())
+                .build();
+
+        String addrLine1 = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
+        if (addrLine1 != null && !addrLine1.trim().isEmpty()) {
+            Address address = Address.builder()
+                    .customer(customer)
+                    .recipientName((request.getFirstName() + " " + request.getLastName()).trim())
                     .phone(request.getPhone())
+                    .addressLine1(addrLine1.trim())
+                    .addressLine2(request.getAddressLine2())
+                    .city(request.getCity() != null ? request.getCity().trim() : "Colombo")
+                    .district(request.getDistrict())
+                    .province(request.getProvince())
+                    .postalCode(request.getPostalCode())
+                    .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka")
+                    .addressType("HOME")
+                    .isDefault(true)
+                    .latitude(request.getLatitude())
+                    .longitude(request.getLongitude())
                     .build();
-            user.setAdmin(admin);
-        } else {
-            Customer customer = Customer.builder()
-                    .user(user)
-                    .firstName(request.getFirstName())
-                    .lastName(request.getLastName())
-                    .phone(request.getPhone())
-                    .dateOfBirth(request.getDateOfBirth())
-                    .profileImage(request.getProfileImage())
-                    .addresses(new ArrayList<>())
-                    .build();
 
-            String addrLine1 = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
-            if (addrLine1 != null && !addrLine1.trim().isEmpty()) {
-                Address address = Address.builder()
-                        .customer(customer)
-                        .recipientName((request.getFirstName() + " " + request.getLastName()).trim())
-                        .phone(request.getPhone())
-                        .addressLine1(addrLine1.trim())
-                        .addressLine2(request.getAddressLine2())
-                        .city(request.getCity() != null ? request.getCity().trim() : "Colombo")
-                        .district(request.getDistrict())
-                        .province(request.getProvince())
-                        .postalCode(request.getPostalCode())
-                        .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka")
-                        .addressType("HOME")
-                        .isDefault(true)
-                        .latitude(request.getLatitude())
-                        .longitude(request.getLongitude())
-                        .build();
-
-                customer.getAddresses().add(address);
-            }
-
-            user.setCustomer(customer);
+            customer.getAddresses().add(address);
         }
 
+        user.setCustomer(customer);
         userRepository.save(user);
         return "User registered successfully!";
+    }
+
+    /**
+     * Dedicated protected workflow for administrator creation.
+     * Can only be called via authenticated admin-protected endpoints.
+     */
+    @Transactional
+    public String registerAdmin(RegisterRequest request) {
+        Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
+        if (existingUser.isPresent()) {
+            return "Email already exists!";
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role("ADMIN")
+                .accountStatus("ACTIVE")
+                .tokenVersion(1L)
+                .build();
+
+        Admin admin = Admin.builder()
+                .user(user)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phone(request.getPhone())
+                .build();
+        user.setAdmin(admin);
+
+        userRepository.save(user);
+        return "Admin registered successfully!";
     }
 
     @Transactional(readOnly = true)
@@ -119,33 +146,183 @@ public class UserService {
         return userRepository.findById(id);
     }
 
+    // ── Paginated user listing for admin ────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserSummaryDto> getUsersForAdmin(Pageable pageable, String search, String role) {
+        return userRepository.searchUsersForAdmin(search, role, pageable)
+                .map(AdminUserSummaryDto::fromUser);
+    }
+
+    // ── Reauthentication ────────────────────────────────────────────────────────
+
+    /**
+     * Validates the admin's password for reauthentication on sensitive operations.
+     * @throws SecurityException if the password does not match.
+     */
+    public void validateAdminPassword(String adminEmail, String rawPassword) {
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new RuntimeException("Admin user not found"));
+        if (!passwordEncoder.matches(rawPassword, admin.getPassword())) {
+            throw new SecurityException("Reauthentication failed: incorrect password");
+        }
+    }
+
+    // ── Promotion with profile consistency ──────────────────────────────────────
+
     @Transactional
-    public String promoteToAdmin(String email) {
+    public String promoteToAdmin(String email, String actorEmail) {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             return "User not found with email: " + email;
         }
         User user = userOpt.get();
+        if ("ADMIN".equals(user.getRole())) {
+            return "User is already an ADMIN";
+        }
+
         user.setRole("ADMIN");
+
+        // Profile consistency: create Admin profile from Customer data if missing
+        if (user.getAdmin() == null) {
+            String firstName = "Unknown";
+            String lastName = "User";
+            String phone = null;
+
+            if (user.getCustomer() != null) {
+                firstName = user.getCustomer().getFirstName();
+                lastName = user.getCustomer().getLastName();
+                phone = user.getCustomer().getPhone();
+            }
+
+            Admin admin = Admin.builder()
+                    .user(user)
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .phone(phone)
+                    .build();
+            user.setAdmin(admin);
+        }
+
         userRepository.save(user);
+
+        auditService.log(actorEmail, "ROLE_PROMOTION", "USER", user.getId(),
+                "Promoted " + email + " from CUSTOMER to ADMIN");
+
         return "User promoted to ADMIN successfully!";
     }
 
+    /**
+     * @deprecated Use {@link #promoteToAdmin(String, String)} with actorEmail for audit logging.
+     */
+    @Deprecated
     @Transactional
-    public String demoteToUser(Long id) {
+    public String promoteToAdmin(String email) {
+        return promoteToAdmin(email, "SYSTEM");
+    }
+
+    // ── Demotion with last-admin protection & profile consistency ────────────────
+
+    @Transactional
+    public String demoteToUser(Long id, String actorEmail) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return "User not found";
         }
         User user = userOpt.get();
+
+        if (!"ADMIN".equals(user.getRole())) {
+            return "User is not an ADMIN";
+        }
+
+        // Last active administrator protection
+        long activeAdminCount = userRepository.countByRoleAndAccountStatus("ADMIN", "ACTIVE");
+        if (activeAdminCount <= 1) {
+            throw new IllegalStateException("Cannot demote the last active administrator");
+        }
+
         user.setRole("CUSTOMER");
+
+        // Profile consistency: create Customer profile from Admin data if missing
+        if (user.getCustomer() == null) {
+            String firstName = "Unknown";
+            String lastName = "User";
+            String phone = null;
+
+            if (user.getAdmin() != null) {
+                firstName = user.getAdmin().getFirstName();
+                lastName = user.getAdmin().getLastName();
+                phone = user.getAdmin().getPhone();
+            }
+
+            Customer customer = Customer.builder()
+                    .user(user)
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .phone(phone)
+                    .addresses(new ArrayList<>())
+                    .build();
+            user.setCustomer(customer);
+        }
+
         userRepository.save(user);
+
+        auditService.log(actorEmail, "ROLE_DEMOTION", "USER", user.getId(),
+                "Demoted " + user.getEmail() + " from ADMIN to CUSTOMER");
+
         return "User demoted to CUSTOMER successfully!";
     }
 
+    /**
+     * @deprecated Use {@link #demoteToUser(Long, String)} with actorEmail for audit logging.
+     */
+    @Deprecated
+    @Transactional
+    public String demoteToUser(Long id) {
+        return demoteToUser(id, "SYSTEM");
+    }
+
+    // ── Controlled deactivation (replaces hard deletion) ────────────────────────
+
+    @Transactional
+    public void deactivateUser(Long id, String actorEmail) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Last active administrator protection
+        if ("ADMIN".equals(user.getRole())) {
+            long activeAdminCount = userRepository.countByRoleAndAccountStatus("ADMIN", "ACTIVE");
+            if (activeAdminCount <= 1) {
+                throw new IllegalStateException("Cannot deactivate the last active administrator");
+            }
+        }
+
+        user.setAccountStatus("DEACTIVATED");
+        userRepository.save(user);
+
+        auditService.log(actorEmail, "ACCOUNT_DEACTIVATION", "USER", user.getId(),
+                "Deactivated account for " + user.getEmail());
+    }
+
+    @Transactional
+    public void reactivateUser(Long id, String actorEmail) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAccountStatus("ACTIVE");
+        userRepository.save(user);
+
+        auditService.log(actorEmail, "ACCOUNT_REACTIVATION", "USER", user.getId(),
+                "Reactivated account for " + user.getEmail());
+    }
+
+    /**
+     * @deprecated Use {@link #deactivateUser(Long, String)} for controlled deactivation.
+     */
+    @Deprecated
     @Transactional
     public void deleteUser(Long id) {
-        userRepository.deleteById(id);
+        deactivateUser(id, "SYSTEM");
     }
 
     public boolean existsByRole(String role) {
@@ -219,8 +396,22 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        // Invalidate existing tokens on password change
+        user.setTokenVersion(user.getTokenVersion() == null ? 2L : user.getTokenVersion() + 1L);
         userRepository.save(user);
         return true;
+    }
+
+    /**
+     * Increments the token version for the user, instantly invalidating any active JWT sessions.
+     */
+    @Transactional
+    public void invalidateTokens(String email) {
+        if (email == null) return;
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setTokenVersion(user.getTokenVersion() == null ? 2L : user.getTokenVersion() + 1L);
+            userRepository.save(user);
+        });
     }
 
     // ==========================================

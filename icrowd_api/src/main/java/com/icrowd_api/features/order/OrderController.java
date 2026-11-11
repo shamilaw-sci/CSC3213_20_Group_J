@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -149,12 +150,33 @@ public class OrderController {
     }
 
     /**
-     * Legacy receipt upload endpoint for backward compatibility.
+     * Upload a payment receipt for an order.
+     * BOLA ownership check: only the order owner or an ADMIN may upload.
      */
     @PostMapping("/{id}/receipt")
-    public ResponseEntity<?> uploadReceipt(@PathVariable Long id, @RequestParam("file") MultipartFile file, Authentication authentication) {
-        if (authentication == null) return ResponseEntity.status(401).build();
-        orderService.getPaymentStatus(id, authentication.getName());
+    public ResponseEntity<?> uploadReceipt(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        if (authentication == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+        }
+
+        // Ownership / ADMIN bypass check
+        Order order = orderService.findById(id);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        boolean isAdmin = authentication.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean isOwner = order.getUser() != null && order.getUser().getEmail() != null &&
+                order.getUser().getEmail().equals(authentication.getName());
+
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(403).body(Map.of("message", "Access denied: not your order"));
+        }
+
         try {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body("File is empty");

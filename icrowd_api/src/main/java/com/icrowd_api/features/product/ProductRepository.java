@@ -30,6 +30,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, org.spr
     @Query("SELECT DISTINCT TRIM(p.brand) FROM Product p WHERE p.isActive = true AND LOWER(p.category.name) = LOWER(:category) AND p.brand IS NOT NULL AND TRIM(p.brand) <> ''")
     List<String> findBrandsByCategory(@Param("category") String category);
 
+    Optional<Product> findBySku(String sku);
+    boolean existsBySku(String sku);
+
     // Customer-facing: only active products
     Page<Product> findByIsActiveTrue(Pageable pageable);
     Optional<Product> findByIdAndIsActiveTrue(Long id);

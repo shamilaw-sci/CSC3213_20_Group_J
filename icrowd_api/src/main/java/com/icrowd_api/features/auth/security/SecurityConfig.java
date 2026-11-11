@@ -24,8 +24,6 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
-    private String frontendUrl;
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -50,19 +48,34 @@ public class SecurityConfig {
                 .requestMatchers("/api/products/*/reviews/**", "/api/products/*/questions/**").authenticated()
                 // Public review reads
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
-                // Admin-only write operations on products
-                .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/products/admin/**").hasRole("ADMIN")
-                // Admin-only write operations on categories
-                .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
-                // All /api/admin/** and /api/analytics/** require ADMIN role
+                // Public promo availability check
+                .requestMatchers(HttpMethod.GET, "/api/promo/available").permitAll()
+
+                // ── Inventory Management (ADMIN or INVENTORY_MANAGER) ──────────────
+                // Product write operations
+                .requestMatchers(HttpMethod.POST, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/products/admin/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                // Category write operations
+                .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+                // Dashboard is available to both admin and inventory manager
+                .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN", "INVENTORY_MANAGER")
+
+                // ── Account Administration (ADMIN only) ───────────────────────────
+                // User management and audit logs are strictly admin-only
+                .requestMatchers("/api/admin/users/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/audit-logs/**").hasRole("ADMIN")
+                // All other /api/admin/** and /api/analytics/** require ADMIN role
                 .requestMatchers("/api/admin/**", "/api/analytics/**").hasRole("ADMIN")
-                // Auth/me and create-admin require authentication
-                .requestMatchers("/api/auth/me", "/api/auth/create-admin").authenticated()
+
+                // ── Authenticated users ───────────────────────────────────────────
+                // Admin-only auth management
+                .requestMatchers("/api/auth/register-admin", "/api/auth/create-admin").hasRole("ADMIN")
+                // Auth/me and logout require authentication
+                .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
                 // User profile and address endpoints require authentication
                 .requestMatchers("/api/users/**").authenticated()
                 // Cart and order endpoints require authentication
@@ -86,12 +99,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // HEAD: localhost:5173 | developer: adds 127.0.0.1:5173 and localhost:3000
-        configuration.setAllowedOrigins(java.util.stream.Stream.of(frontendUrl,
+        configuration.setAllowedOrigins(List.of(
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:3000"
-        ).distinct().toList());
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

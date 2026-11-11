@@ -30,15 +30,37 @@ public class CustomUserDetailsService implements UserDetailsService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + rawRole));
 
-        // Alias CUSTOMER and USER so both hasRole('CUSTOMER') and hasRole('USER') work
-        if ("CUSTOMER".equals(rawRole) || "USER".equals(rawRole)) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-            authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+        switch (rawRole) {
+            case "ADMIN" -> {
+                // Admin inherits inventory manager powers and all permissions
+                authorities.add(new SimpleGrantedAuthority("ROLE_INVENTORY_MANAGER"));
+                authorities.add(new SimpleGrantedAuthority("PERM_ACCOUNTS_MANAGE"));
+                authorities.add(new SimpleGrantedAuthority("PERM_INVENTORY_MANAGE"));
+                authorities.add(new SimpleGrantedAuthority("PERM_ANALYTICS_VIEW"));
+            }
+            case "INVENTORY_MANAGER" -> {
+                // Inventory managers can only manage products/categories/stock
+                authorities.add(new SimpleGrantedAuthority("PERM_INVENTORY_MANAGE"));
+            }
+            default -> {
+                // CUSTOMER / USER — alias both so hasRole('CUSTOMER') and hasRole('USER') both work
+                authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+            }
         }
+
+        boolean enabled = user.getAccountStatus() == null 
+                || (!"DEACTIVATED".equalsIgnoreCase(user.getAccountStatus()) && !"SUSPENDED".equalsIgnoreCase(user.getAccountStatus()));
+        boolean accountNonLocked = user.getAccountStatus() == null 
+                || !"LOCKED".equalsIgnoreCase(user.getAccountStatus());
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
+                enabled,
+                true,
+                true,
+                accountNonLocked,
                 authorities
         );
     }

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { getCurrentUser, loginUser, registerUser } from '../api/authApi';
+import { getCurrentUser, loginUser, registerUser, logoutUser } from '../api/authApi';
 
 export const AuthContext = createContext(null);
 
@@ -62,7 +62,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = async () => {
+        try {
+            await logoutUser();
+        } catch {
+            // Clear local session even if the logout request fails.
+        } finally {
         localStorage.removeItem('token');
         sessionStorage.removeItem('checkoutData');
         sessionStorage.removeItem('iCrowd_guest_cart');
@@ -71,6 +76,7 @@ export const AuthProvider = ({ children }) => {
             sessionStorage.removeItem(`iCrowd_promo:${user.id || user.email}`);
         }
         setUser(null);
+        }
     };
 
     const updateUser = (updatedUserData) => {

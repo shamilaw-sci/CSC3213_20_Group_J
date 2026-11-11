@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'CUSTOMER',
     account_status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    token_version BIGINT NOT NULL DEFAULT 1,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -270,3 +271,21 @@ CREATE INDEX IF NOT EXISTS idx_payments_internal_payment_id ON payments(internal
 CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
 CREATE INDEX IF NOT EXISTS idx_promo_usages_promo_id ON promo_code_usages(promo_id);
 CREATE INDEX IF NOT EXISTS idx_promo_usages_user_id ON promo_code_usages(user_id);
+
+-- ----------------------------------------------------------------------------
+-- 7. AUDIT LOGS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    actor_email VARCHAR(255) NOT NULL,
+    action VARCHAR(100) NOT NULL,        -- ROLE_PROMOTION, ROLE_DEMOTION, ACCOUNT_DEACTIVATION, ACCOUNT_REACTIVATION, PRICE_CHANGE, STOCK_ADJUSTMENT, PRODUCT_CREATED
+    entity_type VARCHAR(50) NOT NULL,    -- USER, PRODUCT
+    entity_id BIGINT NOT NULL,
+    details VARCHAR(1000),
+    timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_email ON audit_logs(actor_email);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+
