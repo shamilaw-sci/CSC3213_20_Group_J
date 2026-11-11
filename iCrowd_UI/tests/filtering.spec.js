@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 test('filters combine, reset pagination, survive navigation and clear', async ({ page }) => {
  const requests=[];
- await page.route('**/api/**', async route => {
+ // Match backend requests without intercepting Vite's /src/**/api/ modules.
+ await page.route(url => url.pathname.startsWith('/api/'), async route => {
   const url=new URL(route.request().url());
   if(url.pathname==='/api/categories') return route.fulfill({json:[{id:9,name:'Chargers'}]});
   if(url.pathname==='/api/products') { requests.push(url.searchParams); return route.fulfill({json:{content:[],totalElements:0,totalPages:0,number:0,size:8}}); }
