@@ -28,6 +28,7 @@ class StorefrontIntegrationTest {
     @Autowired UserRepository users;
     @Autowired JwtUtil jwt;
     @Autowired PromoCodeRepository promos;
+    @Autowired PromoCodeUsageRepository promoUsages;
     @Autowired OrderRepository orders;
     @Autowired TransactionTemplate tx;
     @Autowired StorefrontHeroRepository heroes;
@@ -71,7 +72,10 @@ class StorefrontIntegrationTest {
         tx.executeWithoutResult(status -> {
             promos.save(PromoCode.builder().code(prefix+"SELECT").discountType(DiscountType.FIXED).discountValue(BigDecimal.valueOf(500)).minimumOrderAmount(BigDecimal.valueOf(1000)).customerEligibility(CustomerEligibility.SELECTED_CUSTOMERS).eligibleCustomerEmails(new ArrayList<>(List.of(buyer.getEmail()))).build());
             promos.save(PromoCode.builder().code(prefix+"EXPIRED").discountType(DiscountType.FIXED).discountValue(BigDecimal.TEN).expiryDate(LocalDate.now().minusDays(1)).build());
-            promos.save(PromoCode.builder().code(prefix+"USED").discountType(DiscountType.FIXED).discountValue(BigDecimal.TEN).totalUsageLimit(1).usageCount(1).build());
+            var usedPromo = promos.save(PromoCode.builder().code(prefix+"USED").discountType(DiscountType.FIXED).discountValue(BigDecimal.TEN).totalUsageLimit(1).build());
+            // Usage limits count persisted redemptions, not the legacy usageCount field.
+            var redeemedOrder = orders.save(Order.builder().user(buyer).orderReference(prefix+"-REDEEMED").status(OrderStatus.CONFIRMED).paymentMethod(PaymentMethod.COD).paymentStatus(PaymentStatus.DUE_ON_DELIVERY).deliveryType(DeliveryType.STANDARD).build());
+            promoUsages.save(PromoCodeUsage.builder().promoCode(usedPromo).customer(buyer).order(redeemedOrder).build());
         });
         String available = call("GET", "/promo/available?cartSubTotal=2000", buyer, null, null).body();
         assertTrue(available.contains(prefix+"SELECT"));
