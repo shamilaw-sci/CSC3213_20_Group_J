@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { useAddressBook } from '../hooks/useAddressBook';
 import AccountSidebar from '../components/AccountSidebar';
@@ -20,7 +21,8 @@ import ChangePasswordForm from '../components/ChangePasswordForm';
  * E-commerce Manage My Account page (Daraz-inspired structure and UX)
  */
 const ProfilePage = () => {
-    const [activeTab, setActiveTab] = useState('manage-account');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'orders' ? 'orders' : 'manage-account');
     const {
         profile,
         formData,
@@ -205,7 +207,7 @@ const ProfilePage = () => {
                                     </button>
                                 </div>
 
-                                <OrdersView filterType={activeTab} />
+                                <OrdersView key={activeTab} filterType={activeTab} />
                             </div>
                         )}
 

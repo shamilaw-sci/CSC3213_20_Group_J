@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useCart } from '../../cart/hooks/CartContext';
@@ -21,7 +21,7 @@ const SRI_LANKA_DISTRICTS = [
 
 const ShippingPage = () => {
   const { user } = useAuth();
-  const { cart, getCartTotal, getItemCount } = useCart();
+  const { cart, cartLoading, cartReady, syncError, promo, promoBusy, getCartTotal, getItemCount } = useCart();
   const { addresses, defaultAddress } = useAddressBook(user);
   const navigate = useNavigate();
 
@@ -47,13 +47,14 @@ const ShippingPage = () => {
 
   // Backend calculated pricing summary
   const [validatedSummary, setValidatedSummary] = useState(null);
+  const quoteRevision = useRef(0);
 
   // Redirect if cart empty
   useEffect(() => {
-    if (cart.length === 0) {
+    if (!cartLoading && (!cartReady || syncError || cart.length === 0)) {
       navigate('/cart');
     }
-  }, [cart, navigate]);
+  }, [cart, cartLoading, cartReady, syncError, navigate]);
 
   // Initial user prefill & address book loading
   useEffect(() => {
@@ -131,6 +132,7 @@ const ShippingPage = () => {
   const calculateBackendQuote = useCallback(async (currentDeliveryType) => {
     if (!cart || cart.length === 0) return;
 
+    const revision = ++quoteRevision.current;
     setIsQuoteLoading(true);
     setServerError('');
 
@@ -144,6 +146,7 @@ const ShippingPage = () => {
         latitude: mapLocation ? mapLocation[0] : 6.9271,
         longitude: mapLocation ? mapLocation[1] : 79.8612,
         deliveryType: currentDeliveryType || deliveryType,
+        promoCode: promo?.promoCode || null,
         saveAddress: false, // Don't save during live calculation preview
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -152,6 +155,7 @@ const ShippingPage = () => {
       };
 
       const quote = await validateShippingDetails(payload);
+      if (revision !== quoteRevision.current) return;
       if (quote && quote.valid) {
         setValidatedSummary(quote);
       }
@@ -159,9 +163,9 @@ const ShippingPage = () => {
       console.warn("Backend pricing calculation note:", err?.response?.data || err?.message);
       // Fallback display if temporary connection issue
     } finally {
-      setIsQuoteLoading(false);
+      if (revision === quoteRevision.current) setIsQuoteLoading(false);
     }
-  }, [cart, formData, deliveryType, mapLocation, user]);
+  }, [cart, formData, deliveryType, mapLocation, user, promo]);
 
   // Recalculate quote when delivery method or cart changes
   useEffect(() => {
@@ -169,7 +173,7 @@ const ShippingPage = () => {
       calculateBackendQuote(deliveryType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deliveryType, cart.length]);
+  }, [deliveryType, cart, promo]);
 
   // Frontend field validation
   const validateFrontend = () => {
@@ -217,6 +221,7 @@ const ShippingPage = () => {
   // Handle Form Submission -> Backend Validation -> Proceed to Payment
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (promoBusy) return;
     setServerError('');
 
     // Step 1: Run Frontend Validation
@@ -242,6 +247,7 @@ const ShippingPage = () => {
         latitude: mapLocation ? mapLocation[0] : null,
         longitude: mapLocation ? mapLocation[1] : null,
         deliveryType: deliveryType,
+        promoCode: promo?.promoCode || null,
         saveAddress: Boolean(user && saveAddress),
         addressLabel: addressLabel,
         items: cart.map((item) => ({
@@ -260,6 +266,8 @@ const ShippingPage = () => {
 
       // Step 3: Store validated checkout details with trusted backend calculations
       const checkoutData = {
+        owner: String(user.id || user.email),
+        promoCode: promo?.promoCode || null,
         shippingFullName: formData.fullName.trim(),
         shippingPhone: formData.phone.trim(),
         shippingEmail: formData.email.trim(),
@@ -282,7 +290,7 @@ const ShippingPage = () => {
       };
 
       // Persist validated checkout session data for payment page
-      localStorage.setItem('checkoutData', JSON.stringify(checkoutData));
+      sessionStorage.setItem('checkoutData', JSON.stringify(checkoutData));
 
       // Step 4: Continue to Payment without creating order or initiating payment
       navigate('/checkout/payment');
@@ -310,21 +318,21 @@ const ShippingPage = () => {
   const displayTotal = validatedSummary?.totalAmount != null ? Number(validatedSummary.totalAmount) : (displaySubTotal - displayDiscount + displayShippingCost);
 
   return (
-    <div className="flex flex-col md:flex-row gap-8">
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
       {/* Left: Form */}
-      <div className="md:w-2/3">
+      <div className="min-w-0">
         {/* Backend Error Alert */}
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 mb-6 flex items-start gap-3 animate-fade-in">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">Validation Error</p>
+              <p className="font-semibold text-sm">Please check your details</p>
               <p className="text-xs text-red-700 mt-0.5">{serverError}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm mb-6">
+        <div className="bg-white p-5 sm:p-7 rounded-[32px] border border-gray-100 shadow-sm mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <MapPin size={24} /> Shipping Information
@@ -486,7 +494,7 @@ const ShippingPage = () => {
         </div>
 
         {/* Map Location Section */}
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm mb-6">
+        <div className="bg-white p-5 sm:p-7 rounded-[32px] border border-gray-100 shadow-sm mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <MapPin size={20} /> Pin Your Location
@@ -513,7 +521,7 @@ const ShippingPage = () => {
         </div>
 
         {/* Delivery Method Selection */}
-        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
+        <div className="bg-white p-5 sm:p-7 rounded-[32px] border border-gray-100 shadow-sm">
           <h2 className="text-xl font-bold mb-4">Delivery Method</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label
@@ -534,7 +542,7 @@ const ShippingPage = () => {
                   <Truck size={18} /> Standard Delivery
                 </div>
                 <p className="text-sm text-gray-500">3-5 Business Days</p>
-                <p className="font-semibold text-black mt-2">Rs. 200.00</p>
+                <p className="font-semibold text-black mt-2">LKR 200.00</p>
               </div>
             </label>
 
@@ -556,7 +564,7 @@ const ShippingPage = () => {
                   <Zap size={18} className="text-amber-500" /> Fast Delivery
                 </div>
                 <p className="text-sm text-gray-500">1-2 Business Days</p>
-                <p className="font-semibold text-black mt-2">Rs. 500.00</p>
+                <p className="font-semibold text-black mt-2">LKR 500.00</p>
               </div>
             </label>
           </div>
@@ -565,12 +573,12 @@ const ShippingPage = () => {
       </div>
 
       {/* Right: Validated Order Summary */}
-      <div className="md:w-1/3">
+      <div className="min-w-0">
         <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm sticky top-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold">Order Summary</h2>
             <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-              <ShieldCheck size={14} /> Validated Pricing
+              <ShieldCheck size={14} /> Order estimate
             </div>
           </div>
 
@@ -589,7 +597,7 @@ const ShippingPage = () => {
                   <p className="text-sm font-bold text-black line-clamp-2">{item.product.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Qty: {item.quantity}</p>
                   <p className="text-sm font-semibold mt-1">
-                    Rs. {(item.product.price * item.quantity).toFixed(2)}
+                    LKR {(item.product.price * item.quantity).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -606,13 +614,13 @@ const ShippingPage = () => {
 
             <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal ({getItemCount()} items)</span>
-              <span className="font-medium text-gray-900">Rs. {displaySubTotal.toFixed(2)}</span>
+              <span className="font-medium text-gray-900">LKR {displaySubTotal.toFixed(2)}</span>
             </div>
 
             {displayDiscount > 0 && (
               <div className="flex justify-between text-sm text-emerald-700 font-medium">
                 <span>Promotional Discount</span>
-                <span>- Rs. {displayDiscount.toFixed(2)}</span>
+                <span>- LKR {displayDiscount.toFixed(2)}</span>
               </div>
             )}
 
@@ -620,10 +628,10 @@ const ShippingPage = () => {
               <span className="flex items-center gap-1.5">
                 Delivery Fee
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
-                  {deliveryType}
+                  {deliveryType === 'FAST' ? 'Express' : 'Standard'}
                 </span>
               </span>
-              <span className="font-medium text-gray-900">Rs. {displayShippingCost.toFixed(2)}</span>
+              <span className="font-medium text-gray-900">LKR {displayShippingCost.toFixed(2)}</span>
             </div>
 
             {validatedSummary?.estimatedDelivery && (
@@ -642,7 +650,7 @@ const ShippingPage = () => {
                 <span className="text-xs text-gray-500">Includes all taxes & delivery</span>
               </div>
               <span className="text-2xl font-black text-black">
-                Rs. {displayTotal.toFixed(2)}
+                LKR {displayTotal.toFixed(2)}
               </span>
             </div>
           </div>
@@ -651,13 +659,13 @@ const ShippingPage = () => {
           <button
             type="submit"
             form="shipping-form"
-            disabled={isValidating}
+            disabled={isValidating || promoBusy}
             className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
           >
             {isValidating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Validating Shipping...</span>
+                <span>Checking your details…</span>
               </>
             ) : (
               <span>Continue to Payment</span>
@@ -665,7 +673,7 @@ const ShippingPage = () => {
           </button>
 
           <p className="text-[11px] text-gray-400 text-center mt-3">
-            Payment details are securely handled on the next step. No order will be created until payment confirmation.
+            Next, choose how you would like to pay.
           </p>
         </div>
       </div>

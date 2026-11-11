@@ -135,6 +135,11 @@ public class OrderService {
                 : "3-5 Business Days";
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (StringUtils.hasText(request.getPromoCode())) {
+            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
+            discount = validation.getDiscountAmount();
+        }
         BigDecimal totalAmount = subTotal.subtract(discount).add(deliveryFee).setScale(2, RoundingMode.HALF_UP);
 
         Long savedAddressId = null;

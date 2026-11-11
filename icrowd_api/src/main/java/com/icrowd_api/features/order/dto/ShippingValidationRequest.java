@@ -42,6 +42,7 @@ public class ShippingValidationRequest {
     private DeliveryType deliveryType; // STANDARD or FAST
 
     private Boolean saveAddress;
+    private String promoCode;
     private String addressLabel; // e.g. "HOME", "WORK"
 
     @NotEmpty(message = "Order must contain at least one item")

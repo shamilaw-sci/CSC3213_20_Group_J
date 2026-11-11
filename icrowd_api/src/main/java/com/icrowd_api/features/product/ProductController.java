@@ -38,6 +38,11 @@ public class ProductController {
         return ResponseEntity.ok(productService.browse(keyword, category, sort, page, size, minPrice, maxPrice, brand, inStock, minRating, false));
     }
 
+    @GetMapping("/brands")
+    public ResponseEntity<List<String>> getBrands(@RequestParam String category) {
+        return ResponseEntity.ok(productService.getBrands(category));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Product> getProductById(@PathVariable Long id) {
         try {

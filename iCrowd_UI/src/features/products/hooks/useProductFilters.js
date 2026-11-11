@@ -24,6 +24,7 @@ export const useProductFilters = () => {
     }
     
     if (updates.category !== undefined) {
+      params.delete('brand');
       if (updates.category && updates.category !== 'All') params.set('category', updates.category);
       else params.delete('category');
     }

@@ -13,7 +13,8 @@ const CheckoutErrorPage = () => {
   const stateOrderId = location.state?.orderId;
   const orderId = queryOrderId || stateOrderId;
 
-  const errorMessage = location.state?.message || searchParams.get('message') || "Something went wrong during the checkout process.";
+  const errorMessages = { cancelled: 'Payment was cancelled. You can check your order or try again.', declined: 'Payment was declined. Please check your payment details or choose another method.' };
+  const errorMessage = errorMessages[searchParams.get('code')] || 'Payment could not be completed. Check your order status before trying again.';
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState('');
 
