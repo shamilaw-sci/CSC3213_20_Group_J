@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchProducts } from '../api/fetchProducts';
 
-export const useProducts = (keyword = '', category = '', sort = '', page = 0, size = 10) => {
+export const useProducts = (keyword = '', category = '', sort = '', page = 0, size = 10, extra = {}) => {
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({
     totalPages: 0,
@@ -12,12 +12,18 @@ export const useProducts = (keyword = '', category = '', sort = '', page = 0, si
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const extraKey = JSON.stringify(extra);
+  const requestKey = JSON.stringify([keyword, category, sort, page, size, extraKey]);
+  const [settledKey, setSettledKey] = useState(null);
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const data = await fetchProducts(keyword, category, sort, page, size);
+        const data = await fetchProducts(keyword, category, sort, page, size, JSON.parse(extraKey), controller.signal);
         
+        if (!active) return;
         // Spring Data JPA returns the array in "content"
         setProducts(data.content || []);
         
@@ -31,14 +37,15 @@ export const useProducts = (keyword = '', category = '', sort = '', page = 0, si
         
         setError(null);
       } catch (err) {
-        setError('Failed to load products. Make sure the backend is running!');
+        if (active) setError(err.response?.data?.message || 'Unable to load products. Please try again.');
       } finally {
-        setLoading(false);
+        if (active) { setLoading(false); setSettledKey(requestKey); }
       }
     };
 
     loadProducts();
-  }, [keyword, category, sort, page, size]);
+    return () => { active = false; controller.abort(); };
+  }, [keyword, category, sort, page, size, extraKey, requestKey]);
 
-  return { products, pagination, loading, error };
+  return { products, pagination, loading: loading || settledKey !== requestKey, error };
 };

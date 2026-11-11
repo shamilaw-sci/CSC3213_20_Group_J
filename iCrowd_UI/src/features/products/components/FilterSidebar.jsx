@@ -1,54 +1,16 @@
-import React from 'react';
-
-const FilterSidebar = ({ currentCategory, currentSort, onCategoryChange, onSortChange }) => {
-  const categories = ['All', 'Smartphone', 'Headset', 'PowerBank', 'Case'];
-  
-  return (
-    <div className="bg-[#F6F6F6] p-6 rounded-[24px] h-fit sticky top-24 border border-transparent">
-      <h3 className="text-xl font-semibold text-black mb-6 tracking-tight">Filters</h3>
-      
-      {/* Categories */}
-      <div className="mb-8">
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-          Category
-        </h4>
-        <div className="space-y-1 flex flex-col">
-          {categories.map((cat) => {
-            const isSelected = (currentCategory === cat) || (!currentCategory && cat === 'All');
-            return (
-              <button
-                key={cat}
-                onClick={() => onCategoryChange(cat)}
-                className={`text-left px-4 py-2.5 rounded-xl transition-all font-medium ${
-                  isSelected 
-                  ? 'bg-white text-black shadow-sm' 
-                  : 'text-gray-500 hover:bg-gray-200 hover:text-black'
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Sorting */}
-      <div>
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-          Sort By
-        </h4>
-        <select 
-          className="w-full bg-white text-black text-sm font-medium rounded-xl focus:ring-2 focus:ring-black block p-3 outline-none shadow-sm cursor-pointer appearance-none border-none"
-          value={currentSort || ''}
-          onChange={(e) => onSortChange(e.target.value)}
-        >
-          <option value="">Featured</option>
-          <option value="price_asc">Price: Low to High</option>
-          <option value="price_desc">Price: High to Low</option>
-        </select>
-      </div>
-    </div>
-  );
-};
-
-export default FilterSidebar;
+import { useEffect, useState } from 'react';
+import { apiClient } from '../../../lib/axios';
+export default function FilterSidebar({ currentCategory, currentSort, onCategoryChange, onSortChange, extra, updateFilters, clearFilters }) {
+ const [categories,setCategories]=useState([]);
+ const [error,setError]=useState('');
+ useEffect(()=>{ let active=true; apiClient.get('/categories').then(({data})=>{if(active)setCategories(data);}).catch(()=>{if(active)setError('Could not load categories. Refresh to retry.');}); return ()=>{active=false;}; },[]);
+ return <details open className="bg-gray-50 p-6 rounded-3xl"><summary className="font-bold mb-4 cursor-pointer">Filters and sorting</summary>
+ {error && <p role="alert">{error}</p>}
+ <label className="block mb-4">Category<select className="block w-full p-3" value={currentCategory} onChange={e=>onCategoryChange(e.target.value)}><option value="">All categories</option>{categories.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
+ <label className="block mb-4">Sort by<select className="block w-full p-3" value={currentSort || 'newest'} onChange={e=>onSortChange(e.target.value)}>{Object.entries({newest:'Newest',price_asc:'Price: Low to High',price_desc:'Price: High to Low',rating:'Highest rated',name_asc:'Name: A–Z',name_desc:'Name: Z–A'}).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
+ <form key={JSON.stringify(extra)} onSubmit={e=>{e.preventDefault(); const values=Object.fromEntries(new FormData(e.currentTarget)); if(values.minPrice && values.maxPrice && Number(values.minPrice)>Number(values.maxPrice)){setError('Minimum price must not exceed maximum price.');return;} setError('');updateFilters({...values,inStock:values.inStock || ''});}}>
+ {Object.entries({minPrice:'Minimum price',maxPrice:'Maximum price',brand:'Brand'}).map(([key,label])=><label key={key} className="block mb-4">{label}<input className="block w-full p-3" name={key} defaultValue={extra[key]} type={key==='brand'?'text':'number'} min="0" step="0.01"/></label>)}
+ <label className="block mb-4">Minimum rating<select className="block w-full p-3" name="minRating" defaultValue={extra.minRating}><option value="">Any rating</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}+ stars</option>)}</select></label>
+ <label className="block mb-4"><input name="inStock" type="checkbox" value="true" defaultChecked={extra.inStock==='true'}/> In stock only</label>
+ <button className="bg-black text-white p-3 rounded-xl">Apply filters</button></form><button className="mt-4 underline" onClick={clearFilters}>Clear all</button></details>;
+}
