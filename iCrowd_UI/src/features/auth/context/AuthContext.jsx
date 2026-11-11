@@ -6,10 +6,13 @@ export const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [initializing, setInitializing] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const initAuth = async () => {
+            localStorage.removeItem('checkoutData');
+            localStorage.removeItem('iCrowd_cart');
             const token = localStorage.getItem('token');
             if (token) {
                 try {
@@ -21,6 +24,7 @@ export const AuthProvider = ({ children }) => {
                 }
             }
             setLoading(false);
+            setInitializing(false);
         };
         initAuth();
     }, []);
@@ -31,6 +35,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const data = await loginUser(credentials);
             if (data.token) {
+                sessionStorage.removeItem('checkoutData');
                 localStorage.setItem('token', data.token);
                 setUser(data.user);
                 return data.user;
@@ -60,11 +65,17 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await logoutUser();
-        } catch (e) {
-            // Ignore failure on logout call
+        } catch {
+            // Clear local session even if the logout request fails.
         } finally {
-            localStorage.removeItem('token');
-            setUser(null);
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('checkoutData');
+        sessionStorage.removeItem('iCrowd_guest_cart');
+        if (user) {
+            sessionStorage.removeItem(`iCrowd_cart:${user.id || user.email}`);
+            sessionStorage.removeItem(`iCrowd_promo:${user.id || user.email}`);
+        }
+        setUser(null);
         }
     };
 
@@ -78,7 +89,7 @@ export const AuthProvider = ({ children }) => {
     const clearError = () => setError(null);
 
     return (
-        <AuthContext.Provider value={{ user, loading, error, isAdmin, isAuthenticated, login, register, logout, updateUser, clearError }}>
+        <AuthContext.Provider value={{ user, loading, initializing, error, isAdmin, isAuthenticated, login, register, logout, updateUser, clearError }}>
             {children}
         </AuthContext.Provider>
     );

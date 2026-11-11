@@ -8,7 +8,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag, AlertTriangle } from 'lucide-react';
 
 const CartPage = () => {
-  const { cart, updateQuantity, removeFromCart, getCartTotal, getItemCount } = useCart();
+  const { cart, cartLoading, cartReady, syncError, isSyncing, retrySync, retryLoad, updateQuantity, removeFromCart, getCartTotal, getItemCount } = useCart();
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const location = useLocation();
@@ -44,6 +44,9 @@ const CartPage = () => {
     navigate('/checkout/shipping');
   };
 
+  if (cartLoading) return <p role="status" className="p-8">Loading your cart…</p>;
+  if (!cartReady) return <div className="p-8"><p role="alert">{syncError}</p><button onClick={retryLoad}>Retry loading cart</button></div>;
+  const saveNotice = syncError && <div role="alert" className="mb-6 rounded-xl bg-amber-50 p-4 text-amber-800">{syncError} <button onClick={retrySync} disabled={isSyncing} className="underline">{isSyncing ? 'Saving…' : 'Retry saving cart'}</button></div>;
   if (cart.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16">
@@ -52,6 +55,7 @@ const CartPage = () => {
             <ShoppingBag size={48} className="text-gray-300" />
           </div>
           <h1 className="text-4xl font-bold text-black mb-4">Your cart is empty</h1>
+          {saveNotice}
           {location.state?.checkoutMessage && <p role="status" className="mb-4 text-amber-800">{location.state.checkoutMessage}{location.state.orderStatusUrl && <Link className="block underline mt-2" to={location.state.orderStatusUrl}>Check refund status</Link>}</p>}
           <p className="text-gray-500 mb-8 max-w-md">
             Looks like you haven't added anything to your cart yet. Let's get you back to shopping.
@@ -79,6 +83,7 @@ const CartPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
+      {saveNotice}
       {location.state?.checkoutMessage && <p role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-amber-800">{location.state.checkoutMessage}</p>}
       
       <div className="flex items-center justify-between mb-8">
@@ -133,7 +138,7 @@ const CartPage = () => {
               total={getCartTotal() - (failedItem ? (failedItem.product.price * failedItem.quantity) : 0)} 
               itemCount={getItemCount() - (failedItem ? failedItem.quantity : 0)}
               onCheckout={handleCheckout}
-              disabled={!!failedItem}
+              disabled={!!failedItem || !!syncError || isSyncing}
             />
           </div>
         </div>

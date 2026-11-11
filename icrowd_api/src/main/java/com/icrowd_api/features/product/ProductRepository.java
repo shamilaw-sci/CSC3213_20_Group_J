@@ -27,6 +27,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, org.spr
     @Query("UPDATE Product p SET p.availableStock = p.availableStock + :quantity WHERE p.id = :productId")
     void atomicIncrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
+    @Query("SELECT DISTINCT TRIM(p.brand) FROM Product p WHERE p.isActive = true AND LOWER(p.category.name) = LOWER(:category) AND p.brand IS NOT NULL AND TRIM(p.brand) <> ''")
+    List<String> findBrandsByCategory(@Param("category") String category);
+
     Optional<Product> findBySku(String sku);
     boolean existsBySku(String sku);
 

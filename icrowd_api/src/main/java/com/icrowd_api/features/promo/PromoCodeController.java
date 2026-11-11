@@ -17,7 +17,7 @@ public class PromoCodeController {
     @Autowired
     private PromoCodeService promoCodeService;
 
-    // ── Admin endpoints (ADMIN role required) ─────────────────────────────────
+    // â”€â”€ Admin endpoints (ADMIN role required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -74,12 +74,12 @@ public class PromoCodeController {
         }
     }
 
-    // ── Customer endpoints ────────────────────────────────────────────────────
+    // â”€â”€ Customer endpoint (any authenticated user) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @GetMapping("/available")
-    public ResponseEntity<List<PromoCodeResponse>> getAvailablePromotions(Authentication authentication) {
-        String email = authentication != null ? authentication.getName() : null;
-        return ResponseEntity.ok(promoCodeService.getAvailablePromotions(email));
+    public ResponseEntity<List<PromoValidationResponse>> available(Authentication authentication, @RequestParam(defaultValue = "0") BigDecimal cartSubTotal) {
+        if (authentication == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(promoCodeService.availableFor(authentication.getName(), cartSubTotal));
     }
 
     @PostMapping("/validate")
@@ -94,7 +94,7 @@ public class PromoCodeController {
                 ? request.getCartSubTotal() : BigDecimal.ZERO;
         PromoValidationResponse result =
                 promoCodeService.validateCode(request.getCode(), email, subTotal);
-        // Always return 200 — valid/invalid is communicated in the response body
+        // Always return 200 â€” valid/invalid is communicated in the response body
         return ResponseEntity.ok(result);
     }
 }

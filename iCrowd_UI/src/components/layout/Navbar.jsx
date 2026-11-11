@@ -8,7 +8,7 @@ import { ShoppingBag } from 'lucide-react';
 
 const Navbar = () => {
   const { keyword, setKeyword } = useProductFilters();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { getItemCount } = useCart();
   const navigate = useNavigate();
 
@@ -42,6 +42,7 @@ const Navbar = () => {
           </div>
 
           {/* User Actions */}
+          {isAdmin && <Link to="/admin" className="text-sm font-semibold text-slate-700">Manage store</Link>}
           <div className="flex items-center gap-4 ml-4">
             {isAuthenticated ? (
               <div className="flex items-center gap-3">

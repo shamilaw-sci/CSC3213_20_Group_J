@@ -105,7 +105,7 @@ const SearchBar = ({ initialKeyword, onSearch, placeholder = "Search headsets, p
                       </div>
                       <div className="flex-1 flex justify-between items-center">
                         <span className="font-medium text-sm line-clamp-1">{product.name}</span>
-                        <span className="text-black font-bold text-sm ml-4">${product.price.toFixed(2)}</span>
+                        <span className="text-black font-bold text-sm ml-4">LKR {Number(product.price).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </Link>
                   </li>

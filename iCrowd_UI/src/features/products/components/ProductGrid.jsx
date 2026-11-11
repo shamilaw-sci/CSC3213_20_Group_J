@@ -36,7 +36,7 @@ const ProductGrid = ({ products = [], pagination, onPageChange, title, subtitle,
 
       {pagination && <p role="status" className="mb-4">{pagination.totalElements} results</p>}
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
