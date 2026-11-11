@@ -1,19 +1,26 @@
 import { test, expect } from '@playwright/test';
 test('filters combine, reset pagination, survive navigation and clear', async ({ page }) => {
  const requests=[];
+ const pageErrors=[];
+ page.on('pageerror', error => pageErrors.push(error.message));
  // Match backend requests without intercepting Vite's /src/**/api/ modules.
  await page.route(url => url.pathname.startsWith('/api/'), async route => {
   const url=new URL(route.request().url());
-  if(url.pathname==='/api/categories') return route.fulfill({json:[{id:9,name:'Chargers'}]});
+  if(url.pathname==='/api/categories') return route.fulfill({json:[{id:9,name:'Chargers'},{id:10,name:'Headphones'}]});
+  if(url.pathname==='/api/products/brands') return route.fulfill({json:url.searchParams.get('category') === 'Chargers' ? ['Anker','Belkin'] : ['Sony']});
   if(url.pathname==='/api/products') { requests.push(url.searchParams); return route.fulfill({json:{content:[],totalElements:0,totalPages:0,number:0,size:8}}); }
   return route.fulfill({json:{terms:[],categories:[],products:[]}});
  });
  await page.goto('/search?page=3');
+ await expect(page.getByRole('combobox',{name:'Brand',exact:true})).toHaveCount(0);
  await page.getByRole('combobox',{name:'Category',exact:true}).selectOption('Chargers');
  await expect(page).not.toHaveURL(/page=3/);
+ const brand=page.getByRole('combobox',{name:'Brand',exact:true});
+ await expect(brand.locator('option')).toHaveText(['All brands','Anker','Belkin']);
+ await brand.selectOption('Anker');
+ await expect(page).toHaveURL(/brand=Anker/);
  await page.getByLabel('Minimum price (LKR)',{exact:true}).fill('500');
  await page.getByLabel('Maximum price (LKR)',{exact:true}).fill('5000');
- await page.getByLabel('Brand',{exact:true}).fill('Anker');
  await page.getByLabel('In stock only').check();
  await page.getByRole('combobox',{name:'Minimum rating',exact:true}).selectOption('4');
  await page.getByRole('button',{name:'Apply filters'}).click();
@@ -25,9 +32,15 @@ test('filters combine, reset pagination, survive navigation and clear', async ({
  await page.reload();
  await expect(page.getByLabel('Minimum price (LKR)',{exact:true})).toHaveValue('500');
  await page.getByRole('button',{name:'Remove brand filter',exact:true}).click();
- await expect(page.getByLabel('Brand',{exact:true})).toHaveValue('');
+ await expect(brand).toHaveValue('');
  await page.goBack();
- await expect(page.getByLabel('Brand',{exact:true})).toHaveValue('Anker');
+ await expect(brand).toHaveValue('Anker');
+ await page.getByRole('combobox',{name:'Category',exact:true}).selectOption('Headphones');
+ await expect(page).not.toHaveURL(/brand=/);
+ await expect(brand).toHaveValue('');
+ await expect(brand.locator('option')).toHaveText(['All brands','Sony']);
  await page.getByRole('button',{name:'Clear all',exact:true}).click();
  await expect(page).toHaveURL(/\/search$/);
+ await expect(brand).toHaveCount(0);
+ expect(pageErrors).toEqual([]);
 });
