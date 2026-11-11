@@ -163,5 +163,29 @@ public class ProductServiceTest {
         assertFalse(results.contains(product1)); // Excludes item already in cart
         assertTrue(results.contains(product2));
     }
+
+    @Test
+    void browseRejectsInvalidInputs() {
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, "unknown", 0, 10, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, -1, 10, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 101, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 10, BigDecimal.TEN, BigDecimal.ONE, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 10, null, null, null, false, 6.0, false));
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void browseUsesStableSortAndRecoversOutOfRangePages() {
+        when(productRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), org.springframework.data.domain.PageRequest.of(8, 10), 12))
+            .thenReturn(new PageImpl<>(List.of(product1), org.springframework.data.domain.PageRequest.of(1, 10), 12));
+        var result = productService.browse(null, null, "price_asc", 8, 10, null, null, null, false, null, false);
+        var pages = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(productRepository, times(2)).findAll(any(org.springframework.data.jpa.domain.Specification.class), pages.capture());
+        assertEquals(1, pages.getAllValues().get(1).getPageNumber());
+        assertNotNull(pages.getValue().getSort().getOrderFor("id"));
+        assertTrue(pages.getValue().getSort().getOrderFor("price").isAscending());
+        assertEquals(List.of(product1), result.getContent());
+    }
 }
 

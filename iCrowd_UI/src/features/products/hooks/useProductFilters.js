@@ -9,11 +9,14 @@ export const useProductFilters = () => {
   const keyword = searchParams.get('q') || '';
   const category = searchParams.get('category') || '';
   const sort = searchParams.get('sort') || '';
-  const page = parseInt(searchParams.get('page') || '0', 10);
+  const rawPage = searchParams.get('page') || '0';
+  const page = /^\d+$/.test(rawPage) && Number.isSafeInteger(Number(rawPage)) ? Number(rawPage) : 0;
+  const extra = Object.fromEntries(['minPrice','maxPrice','brand','inStock','minRating'].map(k => [k, searchParams.get(k) || '']));
 
   const updateFilters = (updates) => {
     const params = new URLSearchParams(location.search);
     
+    Object.entries(updates).forEach(([key,value]) => { if (value) params.set(key,value); else params.delete(key); });
     // Apply updates
     if (updates.q !== undefined) {
       if (updates.q) params.set('q', updates.q);
@@ -41,6 +44,7 @@ export const useProductFilters = () => {
   };
 
   return {
+    extra, updateFilters, clearFilters: () => navigate('/search'),
     keyword,
     category,
     sort,
