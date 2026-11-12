@@ -113,7 +113,7 @@ const ProductDetailPage = () => {
           </p>
 
           <p className="text-4xl font-black text-black mb-8">
-            Rs. {product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            LKR {product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           
           <div className="flex items-center gap-4 mb-8">
@@ -125,7 +125,7 @@ const ProductDetailPage = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 w-full mb-4">
             <AddToCartButton product={product} className="shadow-sm" />
-            <BuyNowButton productId={product.id} />
+            <BuyNowButton product={product} />
           </div>
 
           <ProductFeatures 

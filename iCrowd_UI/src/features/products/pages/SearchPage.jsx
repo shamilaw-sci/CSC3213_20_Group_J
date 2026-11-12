@@ -1,97 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ProductGrid from '../components/ProductGrid';
 import FilterSidebar from '../components/FilterSidebar';
-import AutoCorrectBanner from '../components/AutoCorrectBanner';
 import { useProducts } from '../hooks/useProducts';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { fetchSuggestions } from '../api/fetchSuggestions';
-
-const SearchPage = () => {
-  const { keyword, category, sort, page, setCategory, setSort, setPage } = useProductFilters();
-  
-  // State for auto-correction
-  const [activeKeyword, setActiveKeyword] = useState(keyword);
-  const [originalTypo, setOriginalTypo] = useState(null);
-  const [strictSearch, setStrictSearch] = useState(false);
-
-  // Sync active keyword when URL keyword changes
-  useEffect(() => {
-    setActiveKeyword(keyword);
-    setOriginalTypo(null);
-    setStrictSearch(false);
-  }, [keyword]);
-
-  const pageSize = 8;
-  const { products, pagination, loading, error } = useProducts(activeKeyword, category, sort, page, pageSize);
-
-  // Auto-correction Effect
-  useEffect(() => {
-    if (!loading && !strictSearch && keyword && pagination && pagination.totalElements === 0) {
-      // 0 results! Let's check for a typo
-      fetchSuggestions(keyword).then(data => {
-        if (data.terms && data.terms.length > 0) {
-          const bestMatch = data.terms[0];
-          if (bestMatch.toLowerCase() !== keyword.toLowerCase()) {
-            setOriginalTypo(keyword);
-            setActiveKeyword(bestMatch);
-          }
-        }
-      });
-    }
-  }, [loading, strictSearch, keyword, pagination]);
-
-  const handleSearchOriginal = (typo) => {
-    setStrictSearch(true);
-    setActiveKeyword(typo);
-    setOriginalTypo(null);
-  };
-
-  let title = "All Products";
-  if (activeKeyword) title = `Search Results for "${activeKeyword}"`;
-  else if (category) title = `${category} Accessories`;
-
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-12">
-      <div className="flex flex-col lg:flex-row gap-8">
-        
-        {/* Sidebar */}
-        <div className="w-full lg:w-1/4">
-          <FilterSidebar 
-            currentCategory={category} 
-            currentSort={sort} 
-            onCategoryChange={setCategory}
-            onSortChange={setSort}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="w-full lg:w-3/4">
-          
-          {originalTypo && (
-            <AutoCorrectBanner 
-              originalTerm={originalTypo}
-              correctedTerm={activeKeyword}
-              onSearchOriginal={handleSearchOriginal}
-            />
-          )}
-
-          <ProductGrid 
-            products={products}
-            pagination={pagination}
-            onPageChange={handlePageChange}
-            loading={loading}
-            error={error}
-            title={title}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default SearchPage;
+export default function SearchPage() {
+ const filters=useProductFilters();
+ const {keyword,category,sort,page,extra,updateFilters,clearFilters,setCategory,setSort,setPage}=filters;
+ const result=useProducts(keyword,category,sort,page,8,extra);
+ const [suggestion,setSuggestion]=useState(null);
+ const restricted=Boolean(category || Object.values(extra).some(Boolean));
+ useEffect(()=>{let active=true; setSuggestion(null); if(!result.loading && !result.error && result.pagination.totalElements===0 && keyword && !restricted) fetchSuggestions(keyword).then(data=>{if(active)setSuggestion({keyword,term:data.terms?.[0]});}); return ()=>{active=false;};},[keyword,restricted,result.loading,result.error,result.pagination.totalElements]);
+ return <div className="max-w-7xl mx-auto px-4 py-12"><div className="flex flex-col lg:flex-row gap-8"><aside className="w-full shrink-0 lg:w-64"><FilterSidebar currentCategory={category} currentSort={sort} onCategoryChange={setCategory} onSortChange={setSort} extra={extra} updateFilters={updateFilters} clearFilters={clearFilters}/></aside><main className="w-full min-w-0 lg:flex-1">
+ <div className="flex flex-wrap gap-2 mb-4">{Object.entries({q:keyword,category,...extra}).filter(([,v])=>v).map(([key,value])=><button key={key} className="rounded-full bg-gray-100 px-3 py-2" aria-label={'Remove '+key+' filter'} onClick={()=>updateFilters({[key]:''})}>{key}: {value} ×</button>)}</div>
+ {suggestion?.keyword===keyword && suggestion.term && suggestion.term.toLowerCase()!==keyword.toLowerCase() && <p>Did you mean <button className="underline" onClick={()=>updateFilters({q:suggestion.term})}>{suggestion.term}</button>?</p>}
+ <ProductGrid {...result} title={keyword ? 'Search results for “'+keyword+'”' : category || 'All products'} onPageChange={setPage}/>
+ {!result.loading && !result.error && result.products.length===0 && <button className="underline" onClick={clearFilters}>Clear filters and browse all products</button>}
+ </main></div></div>;
+}

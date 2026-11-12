@@ -4,12 +4,12 @@ import { useCart } from '../../features/cart/hooks/CartContext';
 import { Link } from 'react-router-dom';
 
 const AddToCartButton = ({ product, className = '' }) => {
-  const { addToCart, isProductInCart } = useCart();
+  const { addToCart, isProductInCart, cartLoading, cartReady } = useCart();
   
   if (!product) return null;
 
   const inCart = isProductInCart(product.id);
-  const isOutOfStock = product.availableStock === 0;
+  const isOutOfStock = !(product.availableStock > 0);
 
   if (inCart) {
     return (
@@ -26,7 +26,7 @@ const AddToCartButton = ({ product, className = '' }) => {
   return (
     <button
       type="button"
-      disabled={isOutOfStock}
+      disabled={isOutOfStock || cartLoading || !cartReady}
       onClick={() => addToCart(product)}
       className={`flex-1 ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700 text-white'} px-6 py-4 rounded-2xl font-bold transition-colors flex items-center justify-center gap-2 ${className}`}
     >

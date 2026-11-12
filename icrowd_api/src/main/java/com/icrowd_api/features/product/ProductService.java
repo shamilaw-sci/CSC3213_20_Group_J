@@ -57,6 +57,13 @@ public class ProductService {
 
     // ── Customer-facing ────────────────────────────────────────────────────────
 
+    public List<String> getBrands(String category) {
+        if (category == null || category.isBlank()) return List.of();
+        var brands = new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+        brands.addAll(productRepository.findBrandsByCategory(category.trim()));
+        return List.copyOf(brands);
+    }
+
     public Page<Product> getAllActiveProducts(int page, int size) {
         return productRepository.findByIsActiveTrue(PageRequest.of(page, size));
     }

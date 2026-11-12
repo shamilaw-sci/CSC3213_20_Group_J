@@ -4,6 +4,7 @@ import { useContext } from 'react';
 import { AuthContext } from '../../auth/context/AuthContext';
 
 const navItems = [
+    { to: '/admin/storefront', label: 'Homepage banner', icon: <span aria-hidden="true">▧</span> },
     {
         to: '/admin',
         label: 'Dashboard',

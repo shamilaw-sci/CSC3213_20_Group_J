@@ -30,7 +30,7 @@ public class PromoCodeService {
     @Autowired
     private OrderRepository orderRepository;
 
-    // ── Admin CRUD ────────────────────────────────────────────────────────────
+    // â”€â”€ Admin CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Transactional
     public PromoCodeResponse createPromoCode(PromoCodeRequest req) {
@@ -162,14 +162,23 @@ public class PromoCodeService {
                 .build();
     }
 
-    // ── Validation (customer-facing) ──────────────────────────────────────────
+    // â”€â”€ Validation (customer-facing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     /**
      * Validates a promo code for a given customer and cart subtotal.
-     * Returns a PromoValidationResponse — does NOT persist anything.
+     * Returns a PromoValidationResponse â€” does NOT persist anything.
      */
+    @Transactional(readOnly = true)
+    public List<PromoValidationResponse> availableFor(String email, BigDecimal subtotal) {
+        if (subtotal == null || subtotal.signum() <= 0 || userRepository.findByEmail(email).isEmpty()) return List.of();
+        return promoCodeRepository.findAll().stream().filter(p -> Boolean.TRUE.equals(p.getActive()))
+            .map(p -> validateCode(p.getCode(), email, subtotal)).filter(PromoValidationResponse::isValid).toList();
+    }
+
     public PromoValidationResponse validateCode(String code, String userEmail, BigDecimal cartSubTotal) {
-        PromoCode promo = promoCodeRepository.findByCodeIgnoreCase(code).orElse(null);
+        if (code == null || code.isBlank() || cartSubTotal == null || cartSubTotal.signum() <= 0) return fail("Enter a code and add items to your cart.");
+        if (userRepository.findByEmail(userEmail).isEmpty()) return fail("Sign in to use promotions.");
+        PromoCode promo = promoCodeRepository.findByCodeIgnoreCase(code.trim()).orElse(null);
 
         if (promo == null) {
             return fail("This promo code does not exist.");
@@ -212,7 +221,7 @@ public class PromoCodeService {
                         return fail("You are not eligible for this promo code.");
                     }
                 }
-                default -> { /* ALL — no extra check */ }
+                default -> { /* ALL â€” no extra check */ }
             }
 
             // Per-customer limit
@@ -255,7 +264,7 @@ public class PromoCodeService {
         promoCodeRepository.incrementUsageCount(promo.getId());
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private BigDecimal calculateDiscount(PromoCode promo, BigDecimal subTotal) {
         if (promo.getDiscountType() == DiscountType.FIXED) {

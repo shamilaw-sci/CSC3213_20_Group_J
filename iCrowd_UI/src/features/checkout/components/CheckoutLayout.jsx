@@ -1,13 +1,15 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 
 const CheckoutLayout = ({ children }) => {
+  const { pathname } = useLocation();
+  const step = pathname.endsWith('shipping') ? 0 : pathname.endsWith('payment') ? 1 : 2;
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Minimal Header */}
       <header className="bg-white border-b border-gray-200 py-4">
-        <div className="max-w-4xl mx-auto px-4 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 flex justify-between items-center">
           <Link to="/cart" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center transition-transform group-hover:scale-105">
               <span className="text-white font-bold text-lg leading-none font-sans">i</span>
@@ -23,7 +25,8 @@ const CheckoutLayout = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-grow max-w-4xl mx-auto w-full px-4 py-8">
+      <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-8">
+        <nav aria-label="Checkout progress" className="mb-8 flex flex-wrap gap-4 border-b border-slate-200 pb-5 text-sm">{['Delivery', 'Payment', 'Confirmation'].map((label, index) => <span key={label} aria-current={step === index ? 'step' : undefined} className={`flex items-center gap-2 ${step === index ? 'font-bold text-slate-950' : 'text-slate-500'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-full ${step === index ? 'bg-slate-950 text-white' : 'bg-slate-200'}`}>{index + 1}</span>{label}</span>)}</nav>
         {children}
       </main>
 

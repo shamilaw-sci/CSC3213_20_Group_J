@@ -10,6 +10,7 @@ import { CartProvider } from './features/cart/hooks/CartContext.jsx';
 import LoginPage from './features/auth/pages/LoginPage.jsx';
 import RegisterPage from './features/auth/pages/RegisterPage.jsx';
 import AdminRoute from './features/admin/components/AdminRoute.jsx';
+import AdminStorefront from './features/admin/pages/AdminStorefront.jsx';
 import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminProducts from './features/admin/pages/AdminProducts.jsx';
 import AdminCategories from './features/admin/pages/AdminCategories.jsx';
@@ -113,6 +114,7 @@ function App() {
             >
               <Route index element={<AdminDashboard />} />
               <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="storefront" element={<AdminStorefront />} />
               <Route path="products" element={<AdminProducts />} />
               <Route path="categories" element={<AdminCategories />} />
               <Route path="users" element={<AdminUsers />} />

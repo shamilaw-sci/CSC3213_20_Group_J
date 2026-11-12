@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getAllProductsAdmin,
     createProduct,
@@ -6,17 +6,20 @@ import {
     deleteProduct,
 } from '../api/productAdminApi';
 
-export const useAdminProducts = () => {
+export const useAdminProducts = (keyword = '') => {
+    const requestId = useRef(0);
     const [products, setProducts] = useState([]);
     const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const fetchProducts = useCallback(async (page = 0) => {
+        const id = ++requestId.current;
         setLoading(true);
         setError(null);
         try {
-            const data = await getAllProductsAdmin(page, pagination.size);
+            const data = await getAllProductsAdmin(page, pagination.size, keyword);
+            if (id !== requestId.current) return;
             setProducts(data.content || []);
             setPagination(prev => ({
                 ...prev,
@@ -25,11 +28,11 @@ export const useAdminProducts = () => {
                 totalElements: data.totalElements,
             }));
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to load products');
+            if (id === requestId.current) setError(err.response?.data?.message || 'Failed to load products');
         } finally {
-            setLoading(false);
+            if (id === requestId.current) setLoading(false);
         }
-    }, [pagination.size]);
+    }, [pagination.size, keyword]);
 
     useEffect(() => {
         fetchProducts(0);
