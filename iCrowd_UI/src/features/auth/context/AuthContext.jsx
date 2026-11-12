@@ -68,14 +68,42 @@ export const AuthProvider = ({ children }) => {
         } catch {
             // Clear local session even if the logout request fails.
         } finally {
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('checkoutData');
-        sessionStorage.removeItem('iCrowd_guest_cart');
-        if (user) {
-            sessionStorage.removeItem(`iCrowd_cart:${user.id || user.email}`);
-            sessionStorage.removeItem(`iCrowd_promo:${user.id || user.email}`);
-        }
-        setUser(null);
+            localStorage.removeItem('token');
+
+            // Remove sensitive cached data on logout and reset state
+            const keysToRemove = [];
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+
+                if (
+                    key && (
+                        key.startsWith('user_addresses_') ||
+                        key === 'user_addresses_default' ||
+                        key.startsWith('user_profile_') ||
+                        key === 'iCrowd_cart' ||
+                        key.startsWith('completed-order-') ||
+                        key.startsWith('iCrowd_')
+                    )
+                ) {
+                    keysToRemove.push(key);
+                }
+            }
+
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+
+            // Clear checkout and cart-related session data
+            sessionStorage.removeItem('checkoutData');
+            sessionStorage.removeItem('iCrowd_guest_cart');
+
+            // Clear remaining session data for security
+            try {
+                sessionStorage.clear();
+            } catch (e) {
+                console.warn('Could not clear session storage:', e);
+            }
+
+            setUser(null);
         }
     };
 

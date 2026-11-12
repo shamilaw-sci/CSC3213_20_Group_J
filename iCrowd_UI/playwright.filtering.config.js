@@ -4,4 +4,3 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:5191', screenshot: 'only-on-failure', trace: 'retain-on-failure', browserName: 'chromium', channel: 'msedge' },
   webServer: { command: 'node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5191', url: 'http://127.0.0.1:5191', reuseExistingServer: false }
 });
-
