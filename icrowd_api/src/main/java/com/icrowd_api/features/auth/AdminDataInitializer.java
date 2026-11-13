@@ -15,6 +15,7 @@ import java.time.LocalDate;
  */
 @Component
 @Profile("!prod")
+@org.springframework.core.annotation.Order(1)
 public class AdminDataInitializer implements CommandLineRunner {
 
     @Autowired

@@ -32,4 +32,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId")
     List<Long> findUserPurchasedCategoryIds(@Param("userId") Long userId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.product p " +
+           "LEFT JOIN FETCH p.category " +
+           "WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate " +
+           "AND o.status IN :statuses")
+    List<Order> findQualifyingOrdersBetween(
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate,
+            @Param("statuses") java.util.Collection<OrderStatus> statuses
+    );
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.product p " +
+           "LEFT JOIN FETCH p.category " +
+           "WHERE o.status IN :statuses")
+    List<Order> findAllQualifyingOrders(@Param("statuses") java.util.Collection<OrderStatus> statuses);
+
+    @Modifying
+    @Query("UPDATE Order o SET o.createdAt = :createdAt WHERE o.id = :id")
+    int updateOrderCreatedAt(@Param("id") Long id, @Param("createdAt") java.time.LocalDateTime createdAt);
 }

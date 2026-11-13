@@ -10,7 +10,13 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "order_items")
+@Table(
+    name = "order_items",
+    indexes = {
+        @Index(name = "idx_order_items_order_id", columnList = "order_id"),
+        @Index(name = "idx_order_items_product_id", columnList = "product_id")
+    }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -34,4 +40,20 @@ public class OrderItem {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal priceAtTimeOfPurchase;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal costPriceAtTimeOfPurchase;
+
+    public BigDecimal getEffectiveCostPrice() {
+        if (costPriceAtTimeOfPurchase != null && costPriceAtTimeOfPurchase.compareTo(BigDecimal.ZERO) > 0) {
+            return costPriceAtTimeOfPurchase;
+        }
+        if (product != null) {
+            return product.getEffectiveCostPrice();
+        }
+        if (priceAtTimeOfPurchase != null) {
+            return priceAtTimeOfPurchase.multiply(new BigDecimal("0.60")).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ZERO;
+    }
 }

@@ -44,6 +44,9 @@ public class OrderService {
     @Autowired
     private PromoCodeService promoCodeService;
 
+    @Autowired(required = false)
+    private ShippingPolicy shippingPolicy = new ShippingPolicy();
+
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(\\+?94|0)?[0-9]{9,10}$");
 
     /**
@@ -126,13 +129,8 @@ public class OrderService {
                     .build());
         }
 
-        BigDecimal deliveryFee = request.getDeliveryType() == DeliveryType.FAST
-                ? new BigDecimal("500.00")
-                : new BigDecimal("200.00");
-
-        String estimatedDelivery = request.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        BigDecimal deliveryFee = shippingPolicy.getDeliveryFee(request.getDeliveryType());
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(request.getDeliveryType());
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (StringUtils.hasText(request.getPromoCode())) {
@@ -264,6 +262,7 @@ public class OrderService {
                     .product(product)
                     .quantity(itemDto.getQuantity())
                     .priceAtTimeOfPurchase(product.getPrice())
+                    .costPriceAtTimeOfPurchase(product.getEffectiveCostPrice())
                     .build();
 
             order.getItems().add(orderItem);
@@ -280,9 +279,7 @@ public class OrderService {
         }
         order.setDiscountAmount(discount);
 
-        BigDecimal shippingCost = request.getDeliveryType() == DeliveryType.FAST
-                ? new BigDecimal("500.00")
-                : new BigDecimal("200.00");
+        BigDecimal shippingCost = shippingPolicy.getDeliveryFee(request.getDeliveryType());
 
         BigDecimal totalAmount = subTotal.subtract(discount).add(shippingCost).setScale(2, RoundingMode.HALF_UP);
 
@@ -339,9 +336,7 @@ public class OrderService {
     }
 
     private CreateOrderResponse orderResponse(Order savedOrder) {
-        String estimatedDelivery = savedOrder.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(savedOrder.getDeliveryType());
 
         return CreateOrderResponse.builder()
                 .orderId(savedOrder.getId())
@@ -370,9 +365,7 @@ public class OrderService {
             throw new RuntimeException("Access denied: You do not have permission to view order #" + orderId);
         }
 
-        String estimatedDelivery = order.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(order.getDeliveryType());
 
         return PaymentStatusResponse.builder()
                 .unavailableProductId(order.getUnavailableProductId())
