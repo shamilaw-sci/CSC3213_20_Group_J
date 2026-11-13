@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
-    @Query("SELECT oi.product.id FROM OrderItem oi JOIN oi.order o WHERE o.createdAt >= :startDate AND o.status != 'CANCELLED' GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
+    @Query("SELECT oi.product.id FROM OrderItem oi JOIN oi.order o WHERE o.createdAt >= :startDate AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED') GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
     List<Long> findTopSellingProductIds(@Param("startDate") LocalDateTime startDate, Pageable pageable);
 
     @Query("SELECT oi2.product.id, COUNT(oi2.product.id) " +
@@ -26,4 +26,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("statuses") java.util.Collection<OrderStatus> statuses,
             Pageable pageable
     );
+    @Query("SELECT oi.product.id FROM OrderItem oi WHERE oi.order.status IN ('DELIVERED', 'COMPLETED') AND oi.product.id NOT IN :productIds AND oi.order.id IN (SELECT seed.order.id FROM OrderItem seed WHERE seed.product.id IN :productIds) GROUP BY oi.product.id ORDER BY COUNT(DISTINCT oi.order.id) DESC, oi.product.id ASC")
+    List<Long> findFrequentlyBoughtTogether(@Param("productIds") List<Long> productIds, Pageable pageable);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useProductDetail } from '../hooks/useProductDetail';
 import ProductSlider from '../components/ProductSlider';
 import { fetchSimilarProducts, trackProductView } from '../api/recommendationApi';
@@ -17,6 +17,8 @@ import BuyNowButton from '../../../components/ui/BuyNowButton';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const promo = searchParams.get('promo')?.slice(0, 50);
   
   const { product, loading, error, refresh } = useProductDetail(id);
   const [similarProducts, setSimilarProducts] = useState([]);
@@ -69,6 +71,9 @@ const ProductDetailPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       
+      {promo && <div className="mb-6 border border-amber-200 bg-amber-50 p-4 rounded-xl">
+        Offer code: <strong>{promo}</strong>. Enter this code at checkout. Eligibility, minimum spend and expiry conditions apply; the discount is confirmed at checkout.
+      </div>}
       {/* 1. Product Description Component */}
       <div className="flex flex-col lg:flex-row gap-12 mb-12 bg-[#F6F6F6] p-6 md:p-12 rounded-[32px]">
         

@@ -19,6 +19,7 @@ export const useProductFilters = () => {
     Object.entries(updates).forEach(([key,value]) => { if (value) params.set(key,value); else params.delete(key); });
     // Apply updates
     if (updates.q !== undefined) {
+      params.delete('exact');
       if (updates.q) params.set('q', updates.q);
       else params.delete('q');
     }
@@ -45,6 +46,7 @@ export const useProductFilters = () => {
   };
 
   return {
+    exact: searchParams.get('exact') === '1',
     extra, updateFilters, clearFilters: () => navigate('/search'),
     keyword,
     category,

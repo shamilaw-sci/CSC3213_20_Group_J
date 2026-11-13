@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { fetchProducts } from '../api/fetchProducts';
+import { fetchSuggestions } from '../api/fetchSuggestions';
+import { searchCorrection } from '../api/searchCorrection';
 
-export const useProducts = (keyword = '', category = '', sort = '', page = 0, size = 10, extra = {}) => {
+export const useProducts = (keyword = '', category = '', sort = '', page = 0, size = 10, extra = {}, allowCorrection = false) => {
+  const [correctedKeyword, setCorrectedKeyword] = useState(null);
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({
     totalPages: 0,
@@ -13,7 +16,7 @@ export const useProducts = (keyword = '', category = '', sort = '', page = 0, si
   const [error, setError] = useState(null);
 
   const extraKey = JSON.stringify(extra);
-  const requestKey = JSON.stringify([keyword, category, sort, page, size, extraKey]);
+  const requestKey = JSON.stringify([keyword, category, sort, page, size, extraKey, allowCorrection]);
   const [settledKey, setSettledKey] = useState(null);
   useEffect(() => {
     let active = true;
@@ -21,9 +24,20 @@ export const useProducts = (keyword = '', category = '', sort = '', page = 0, si
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const data = await fetchProducts(keyword, category, sort, page, size, JSON.parse(extraKey), controller.signal);
+        let data = await fetchProducts(keyword, category, sort, page, size, JSON.parse(extraKey), controller.signal);
+        let correction = null;
+        if (active && allowCorrection && keyword.trim() && data.totalElements === 0) {
+          const suggestions = await fetchSuggestions(keyword);
+          if (!active) return;
+          const candidate = searchCorrection(keyword, suggestions);
+          if (candidate) {
+            const related = await fetchProducts(candidate, category, sort, page, size, JSON.parse(extraKey), controller.signal);
+            if (related.totalElements > 0) { data = related; correction = candidate; }
+          }
+        }
         
         if (!active) return;
+        setCorrectedKeyword(correction);
         // Spring Data JPA returns the array in "content"
         setProducts(data.content || []);
         
@@ -45,7 +59,8 @@ export const useProducts = (keyword = '', category = '', sort = '', page = 0, si
 
     loadProducts();
     return () => { active = false; controller.abort(); };
-  }, [keyword, category, sort, page, size, extraKey, requestKey]);
+  }, [keyword, category, sort, page, size, extraKey, requestKey, allowCorrection]);
 
-  return { products, pagination, loading: loading || settledKey !== requestKey, error };
+  return { products, pagination, loading: loading || settledKey !== requestKey, error,
+    correctedKeyword: settledKey === requestKey ? correctedKeyword : null };
 };

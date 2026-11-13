@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
 @Service
 public class ProductService {
 
+    @Autowired(required=false)
+    private com.icrowd_api.features.marketing.CampaignRecorder campaignRecorder;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final OrderRepository orderRepository;
@@ -98,6 +100,7 @@ public class ProductService {
                 predicates.add(cb.or(cb.like(cb.lower(product.get("name")), pattern, '\\'),
                         cb.like(cb.lower(product.get("description")), pattern, '\\'),
                         cb.like(cb.lower(product.get("brand")), pattern, '\\'),
+                        cb.like(cb.lower(product.join("category", jakarta.persistence.criteria.JoinType.LEFT).get("name")), pattern, '\\'),
                         cb.like(cb.lower(product.get("sku")), pattern, '\\')));
             }
             if (category != null && !category.isBlank()) predicates.add(cb.equal(cb.lower(product.get("category").get("name")), category.trim().toLowerCase(java.util.Locale.ROOT)));
@@ -198,6 +201,7 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found"));
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Product createProduct(ProductRequest request, String actorEmail) {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + request.categoryId()));
@@ -215,6 +219,7 @@ public class ProductService {
                 .build();
 
         Product saved = productRepository.save(product);
+        if (campaignRecorder != null && Boolean.TRUE.equals(saved.getIsActive())) campaignRecorder.record("PRODUCT", saved.getId());
         if (auditService != null) {
             auditService.log(actorEmail, "PRODUCT_CREATED", "PRODUCT", saved.getId(),
                     "Created product '" + saved.getName() + "' SKU=" + saved.getSku()
@@ -229,9 +234,12 @@ public class ProductService {
         return createProduct(request, "SYSTEM");
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Product updateProduct(Long id, ProductRequest request, String actorEmail) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        boolean wasActive = Boolean.TRUE.equals(product.getIsActive());
 
         if (request.categoryId() != null) {
             Category category = categoryRepository.findById(request.categoryId())
@@ -266,7 +274,9 @@ public class ProductService {
         if (request.isActive() != null) product.setIsActive(request.isActive());
         if (request.sku() != null) product.setSku(request.sku());
 
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+        if (campaignRecorder != null && !wasActive && Boolean.TRUE.equals(saved.getIsActive())) campaignRecorder.record("PRODUCT", saved.getId());
+        return saved;
     }
 
     /** @deprecated Use {@link #updateProduct(Long, ProductRequest, String)} with actorEmail. */
@@ -302,19 +312,27 @@ public class ProductService {
     // ── Recommendations ────────────────────────────────────────────────────────
 
     public List<Product> getRecommendedProducts(String userEmail, int limit) {
+        if (limit <= 0) return List.of();
+        limit = Math.min(limit, 100);
+        final int requestedLimit = limit;
+        Set<Long> excluded = new HashSet<>();
         List<Product> recommendations = new ArrayList<>();
 
         // 1. Personalized Recommendations (if user is authenticated)
         if (userEmail != null && userRepository != null && orderRepository != null && cartRepository != null) {
             userRepository.findByEmail(userEmail).ifPresent(user -> {
+                excluded.addAll(orderRepository.findUserPurchasedProductIds(user.getId()));
+                excluded.addAll(cartRepository.findUserCartProductIds(user.getId()));
                 Set<Long> favoriteCategoryIds = new HashSet<>();
                 favoriteCategoryIds.addAll(orderRepository.findUserPurchasedCategoryIds(user.getId()));
                 favoriteCategoryIds.addAll(cartRepository.findUserCartCategoryIds(user.getId()));
 
                 if (!favoriteCategoryIds.isEmpty()) {
-                    int personalizedLimit = limit / 2; // 50% personalized
+                    int personalizedLimit = Math.max(1, requestedLimit / 2); // 50% personalized
                     recommendations.addAll(productRepository.findTopProductsByCategories(
-                            new ArrayList<>(favoriteCategoryIds), PageRequest.of(0, personalizedLimit)).getContent());
+                            new ArrayList<>(favoriteCategoryIds), PageRequest.of(0, requestedLimit + excluded.size())).getContent().stream()
+                            .filter(p -> eligible(p) && !excluded.contains(p.getId()))
+                            .limit(personalizedLimit).toList());
                 }
             });
         }
@@ -326,7 +344,7 @@ public class ProductService {
             List<Long> topSellingIds = orderItemRepository.findTopSellingProductIds(thirtyDaysAgo, PageRequest.of(0, remainingLimit * 2));
 
             Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
-                    .filter(Product::getIsActive)
+                    .filter(this::eligible)
                     .collect(Collectors.toMap(Product::getId, p -> p));
 
             List<Product> trendingProducts = new ArrayList<>();
@@ -336,17 +354,19 @@ public class ProductService {
                 }
             }
 
-            recommendations.addAll(trendingProducts);
+            for (Product p : trendingProducts) {
+                if (!excluded.contains(p.getId()) && recommendations.stream().noneMatch(r -> r.getId().equals(p.getId()))) recommendations.add(p);
+            }
         }
 
         // 3. Fallback: If still under limit, fill with highest-rated and newest active products
         if (recommendations.size() < limit) {
             Page<Product> fallbackPage = productRepository.findByIsActiveTrue(
-                    PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
+                    PageRequest.of(0, Math.max(100, limit), Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
             );
             if (fallbackPage != null && fallbackPage.getContent() != null) {
                 for (Product p : fallbackPage.getContent()) {
-                    if (!recommendations.contains(p)) {
+                    if (eligible(p) && !excluded.contains(p.getId()) && recommendations.stream().noneMatch(r -> r.getId().equals(p.getId()))) {
                         recommendations.add(p);
                     }
                     if (recommendations.size() >= limit) break;
@@ -367,7 +387,7 @@ public class ProductService {
 
             if (!topSellingIds.isEmpty()) {
                 Map<Long, Product> productMap = productRepository.findAllById(topSellingIds).stream()
-                        .filter(Product::getIsActive)
+                        .filter(this::eligible)
                         .collect(Collectors.toMap(Product::getId, p -> p));
 
                 for (Long id : topSellingIds) {
@@ -381,11 +401,11 @@ public class ProductService {
         // Fallback: If not enough sales records, backfill with top-rated active products
         if (featured.size() < limit) {
             Page<Product> fallbackPage = productRepository.findByIsActiveTrue(
-                    PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
+                    PageRequest.of(0, Math.max(100, limit), Sort.by(Sort.Direction.DESC, "averageRating", "createdAt"))
             );
             if (fallbackPage != null && fallbackPage.getContent() != null) {
                 for (Product p : fallbackPage.getContent()) {
-                    if (!featured.contains(p)) {
+                    if (eligible(p) && !featured.contains(p)) {
                         featured.add(p);
                     }
                     if (featured.size() >= limit) break;
@@ -403,6 +423,8 @@ public class ProductService {
     }
 
     public List<Product> getSimilarProducts(Long productId, String userEmail, int limit) {
+        if (limit <= 0) return List.of();
+        limit = Math.min(limit, 100);
         Product currentProduct = productRepository.findByIdAndIsActiveTrue(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found or inactive"));
 
@@ -421,14 +443,27 @@ public class ProductService {
             }
         }
 
-        return similar.stream().distinct().limit(limit).collect(Collectors.toList());
+        return similar.stream().filter(this::eligible).filter(p -> !p.getId().equals(productId))
+                .sorted(Comparator.comparingDouble((Product p) -> similarity(p, currentProduct)).reversed().thenComparing(Product::getId))
+                .distinct().limit(limit).collect(Collectors.toList());
     }
 
     public List<Product> getCartSuggestions(List<Long> cartProductIds, String userEmail, int limit) {
+        if (limit <= 0) return List.of();
+        limit = Math.min(limit, 100);
         List<Long> safeCartIds = cartProductIds != null ? cartProductIds : List.of();
         List<Product> suggestions = new ArrayList<>();
 
         if (!safeCartIds.isEmpty()) {
+            // Completed orders provide evidence of useful cross-category additions.
+            if (orderItemRepository != null) {
+                List<Long> relatedIds = orderItemRepository.findFrequentlyBoughtTogether(safeCartIds, PageRequest.of(0, limit * 3));
+                if (!relatedIds.isEmpty()) {
+                    Map<Long, Product> related = productRepository.findAllById(relatedIds).stream()
+                            .filter(this::eligible).collect(Collectors.toMap(Product::getId, p -> p));
+                    for (Long id : relatedIds) if (related.containsKey(id) && !safeCartIds.contains(id)) suggestions.add(related.get(id));
+                }
+            }
             // Find categories for items currently in cart
             Set<Long> cartCategoryIds = productRepository.findAllById(safeCartIds).stream()
                     .map(p -> p.getCategory().getId())
@@ -440,7 +475,7 @@ public class ProductService {
                 ).getContent();
 
                 for (Product p : categoryProducts) {
-                    if (!safeCartIds.contains(p.getId())) {
+                    if (eligible(p) && !safeCartIds.contains(p.getId()) && !suggestions.contains(p)) {
                         suggestions.add(p);
                     }
                 }
@@ -451,7 +486,7 @@ public class ProductService {
         if (suggestions.size() < limit) {
             List<Product> fallbackRecommendations = getRecommendedProducts(userEmail, limit * 2);
             for (Product p : fallbackRecommendations) {
-                if (!safeCartIds.contains(p.getId()) && !suggestions.contains(p)) {
+                if (eligible(p) && !safeCartIds.contains(p.getId()) && !suggestions.contains(p)) {
                     suggestions.add(p);
                 }
                 if (suggestions.size() >= limit) break;
@@ -459,5 +494,23 @@ public class ProductService {
         }
 
         return suggestions.stream().distinct().limit(limit).collect(Collectors.toList());
+    }
+
+    private boolean eligible(Product product) {
+        return Boolean.TRUE.equals(product.getIsActive()) && product.getAvailableStock() != null && product.getAvailableStock() > 0;
+    }
+
+    private double similarity(Product candidate, Product reference) {
+        double score = Objects.equals(candidate.getCategory().getId(), reference.getCategory().getId()) ? 10 : 0;
+        if (candidate.getBrand() != null && candidate.getBrand().equalsIgnoreCase(reference.getBrand())) score += 2;
+        if (candidate.getPrice() != null && reference.getPrice() != null) {
+            double a = candidate.getPrice().doubleValue(), b = reference.getPrice().doubleValue();
+            score += 4 * (1 - Math.abs(a - b) / Math.max(1, Math.max(a, b)));
+        }
+        if (candidate.getTags() != null && reference.getTags() != null)
+            score += Math.min(3, candidate.getTags().stream().filter(reference.getTags()::contains).count());
+        int reviews = candidate.getReviewCount() == null ? 0 : candidate.getReviewCount();
+        double rating = candidate.getAverageRating() == null ? 0 : candidate.getAverageRating();
+        return score + (rating * reviews + 15) / (reviews + 5.0);
     }
 }

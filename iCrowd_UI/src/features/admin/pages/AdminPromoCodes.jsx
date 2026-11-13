@@ -1,3 +1,4 @@
+import MarketingPanel from '../components/MarketingPanel';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tag, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, ChevronDown, ChevronUp } from 'lucide-react';
 import {
@@ -355,6 +356,8 @@ const AdminPromoCodes = () => {
                     <Plus size={16} /> New Code
                 </button>
             </div>
+
+            <MarketingPanel />
 
             {/* Stats */}
             {stats && (

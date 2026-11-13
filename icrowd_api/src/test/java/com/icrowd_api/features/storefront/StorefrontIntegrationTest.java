@@ -36,6 +36,24 @@ class StorefrontIntegrationTest {
     @Autowired com.icrowd_api.features.category.CategoryRepository categories;
     final HttpClient client = HttpClient.newHttpClient();
 
+    @Test void keywordSearchFindsCategoryProductsWithoutSelectingSuggestion() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        var category = categories.save(com.icrowd_api.features.category.Category.builder().name("Headset-" + suffix).build());
+        String name = "Wireless audio " + suffix;
+        products.save(com.icrowd_api.features.product.Product.builder().sku("A-" + suffix).name(name)
+                .category(category).price(BigDecimal.valueOf(50)).availableStock(5).isActive(true).build());
+        String hidden = "Hidden audio " + suffix;
+        products.save(com.icrowd_api.features.product.Product.builder().sku("B-" + suffix).name(hidden)
+                .category(category).price(BigDecimal.valueOf(50)).availableStock(5).isActive(false).build());
+        var response = call("GET", "/products?keyword=HEADSET-" + suffix, null, null, null);
+        assertEquals(200, response.statusCode(), response.body());
+        assertTrue(response.body().contains(name), response.body());
+        assertFalse(response.body().contains(hidden), response.body());
+        var filtered = call("GET", "/products?keyword=headset-" + suffix + "&maxPrice=10", null, null, null);
+        assertEquals(200, filtered.statusCode(), filtered.body());
+        assertFalse(filtered.body().contains(name), filtered.body());
+    }
+
     User user(String role) {
         return users.save(User.builder().email(UUID.randomUUID()+"@example.com").password("test").role(role).build());
     }

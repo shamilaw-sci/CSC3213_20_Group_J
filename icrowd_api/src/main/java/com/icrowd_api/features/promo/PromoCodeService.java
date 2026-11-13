@@ -19,6 +19,9 @@ import java.util.stream.Collectors;
 public class PromoCodeService {
 
     @Autowired
+    private com.icrowd_api.features.marketing.CampaignRecorder campaignRecorder;
+
+    @Autowired
     private PromoCodeRepository promoCodeRepository;
 
     @Autowired
@@ -53,7 +56,9 @@ public class PromoCodeService {
                         ? req.getEligibleCustomerEmails() : new ArrayList<>())
                 .active(true)
                 .build();
-        return PromoCodeResponse.from(promoCodeRepository.save(promo));
+        PromoCode saved = promoCodeRepository.save(promo);
+        if (campaignRecorder != null) campaignRecorder.record("PROMO", saved.getId());
+        return PromoCodeResponse.from(saved);
     }
 
     @Transactional
