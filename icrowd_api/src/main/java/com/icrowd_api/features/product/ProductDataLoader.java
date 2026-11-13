@@ -23,6 +23,7 @@ public class ProductDataLoader {
     }
 
     @Bean
+    @org.springframework.core.annotation.Order(2)
     CommandLineRunner loadProductData(ProductRepository productRepository, CategoryRepository categoryRepository) {
         return args -> {
             // 1. Ensure Categories exist
@@ -831,12 +832,21 @@ public class ProductDataLoader {
 
             // 2. Upsert each product so existing IDs are preserved
             for (Product p : products) {
+                if (p.getCostPrice() == null && p.getPrice() != null) {
+                    p.setCostPrice(p.getPrice().multiply(new BigDecimal("0.58")).setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+                if (p.getLeadTimeDays() == null) {
+                    p.setLeadTimeDays(7);
+                }
+
                 Product existing = productRepository.findBySku(p.getSku()).orElse(null);
                 if (existing != null) {
                     existing.setName(p.getName());
                     existing.setDescription(p.getDescription());
                     existing.setCategory(p.getCategory());
                     existing.setPrice(p.getPrice());
+                    existing.setCostPrice(p.getCostPrice());
+                    existing.setLeadTimeDays(p.getLeadTimeDays());
                     existing.setAvailableStock(p.getAvailableStock());
                     existing.setImageUrls(p.getImageUrls());
                     existing.setTags(p.getTags());

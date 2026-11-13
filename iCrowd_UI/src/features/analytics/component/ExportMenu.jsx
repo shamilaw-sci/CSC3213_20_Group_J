@@ -3,11 +3,12 @@ import {
   exportFullAnalyticsCSV,
   exportTopProductsCSV,
   exportInventoryHealthCSV,
+  exportExcelReport,
   triggerPrintReport,
 } from '../utils/analyticsExportUtils';
 
 /**
- * Export Menu Component supporting CSV Datasets and Printable PDF Reports
+ * Export Menu Component supporting CSV, Excel (.xls) and Printable PDF Reports
  */
 const ExportMenu = ({ data }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,6 +27,11 @@ const ExportMenu = ({ data }) => {
 
   const handleExportFullCSV = () => {
     exportFullAnalyticsCSV(data);
+    setIsOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    exportExcelReport(data);
     setIsOpen(false);
   };
 
@@ -77,6 +83,20 @@ const ExportMenu = ({ data }) => {
               <div>
                 <p className="font-semibold text-white">Save as PDF / Print</p>
                 <p className="text-[10px] text-slate-400">Executive printable layout</p>
+              </div>
+            </button>
+
+            {/* Excel (.xls) Report */}
+            <button
+              onClick={handleExportExcel}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-all text-left group"
+            >
+              <span className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 group-hover:bg-teal-500/20 text-sm">
+                📗
+              </span>
+              <div>
+                <p className="font-semibold text-white">Excel Report (.xls)</p>
+                <p className="text-[10px] text-slate-400">Multi-table financial format</p>
               </div>
             </button>
 

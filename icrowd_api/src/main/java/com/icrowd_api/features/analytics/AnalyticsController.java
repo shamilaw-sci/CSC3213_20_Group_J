@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -21,10 +22,21 @@ public class AnalyticsController {
     private final AnalyticsService analyticsService;
 
     @GetMapping("/summary")
-    public ResponseEntity<AnalyticsSummaryDto> getAnalyticsSummary(
+    public ResponseEntity<?> getAnalyticsSummary(
             @RequestParam(required = false, defaultValue = "all") String range,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(analyticsService.getAnalyticsSummary(range, startDate, endDate));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "false") boolean demo,
+            @RequestParam(required = false, defaultValue = "monthly") String grain) {
+        try {
+            AnalyticsSummaryDto summary = analyticsService.getAnalyticsSummary(range, startDate, endDate, demo, grain);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", 400,
+                    "error", "Bad Request",
+                    "message", e.getMessage()
+            ));
+        }
     }
 }

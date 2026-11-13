@@ -13,12 +13,13 @@ const OpportunityInsightsCard = ({ insights = {}, aiRecommendation = '' }) => {
     restockAlert = '',
     profitOptimization = '',
     generalSummary = '',
+    dataSource = '',
   } = insights;
 
   const strategicPoints = [
     {
       title: 'Top Growth & Expansion Focus',
-      description: topGrowthArea || 'Expand headset lines and premium bundles to capitalize on rising demand trajectory.',
+      description: topGrowthArea || 'Awaiting qualifying sales data to determine leading volume and revenue trajectories.',
       icon: '🚀',
       border: 'border-blue-500/30',
       badge: 'High Growth Area',
@@ -26,17 +27,17 @@ const OpportunityInsightsCard = ({ insights = {}, aiRecommendation = '' }) => {
       bg: 'from-blue-600/10 to-indigo-600/5',
     },
     {
-      title: 'Profit Optimization & Bundling',
-      description: profitOptimization || 'Protective cases deliver 60% gross margin; cross-selling cases at checkout increases average cart margin by ~14%.',
+      title: 'Profit Optimization & Margins',
+      description: profitOptimization || 'Gross margin optimizations will calibrate dynamically from purchase-time costs as orders are placed.',
       icon: '💡',
       border: 'border-emerald-500/30',
-      badge: 'Margin Booster',
+      badge: 'Margin Analysis',
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       bg: 'from-emerald-600/10 to-teal-600/5',
     },
     {
       title: 'Restock Urgency & Supply Chain',
-      description: restockAlert || 'Warehouse inventory is balanced against current 30-day demand forecast.',
+      description: restockAlert || 'Warehouse stock levels are tracked against lead-time demand and statistical safety stock.',
       icon: '⚠️',
       border: 'border-amber-500/30',
       badge: 'Supply Action',
@@ -86,7 +87,12 @@ const OpportunityInsightsCard = ({ insights = {}, aiRecommendation = '' }) => {
         <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex items-start gap-3">
           <span className="text-lg">🤖</span>
           <div className="flex-1">
-            <p className="text-xs font-bold text-white uppercase tracking-wider">AI Executive Summary</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-white uppercase tracking-wider">AI Executive Summary</p>
+              {dataSource && (
+                <span className="text-[10px] text-slate-400 font-mono">Source: {dataSource}</span>
+              )}
+            </div>
             <p className="text-xs text-slate-300 mt-0.5">{aiRecommendation || generalSummary}</p>
           </div>
         </div>

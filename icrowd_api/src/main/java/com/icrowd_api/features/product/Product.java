@@ -49,8 +49,16 @@ public class Product {
     private BigDecimal price;
 
     @PositiveOrZero
+    @Column(precision = 10, scale = 2)
+    private BigDecimal costPrice;
+
+    @PositiveOrZero
     @Column(nullable = false)
     private Integer availableStock;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer leadTimeDays = 7;
 
     @ElementCollection
     @CollectionTable(name = "product_image_urls", joinColumns = @JoinColumn(name = "product_id"))
@@ -95,4 +103,14 @@ public class Product {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public BigDecimal getEffectiveCostPrice() {
+        if (costPrice != null && costPrice.compareTo(BigDecimal.ZERO) > 0) {
+            return costPrice;
+        }
+        if (price != null) {
+            return price.multiply(new BigDecimal("0.60")).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ZERO;
+    }
 }

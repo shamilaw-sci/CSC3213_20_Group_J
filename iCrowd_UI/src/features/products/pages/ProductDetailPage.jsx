@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useProductDetail } from '../hooks/useProductDetail';
 import ProductSlider from '../components/ProductSlider';
-import { fetchSimilarProducts } from '../api/recommendationApi';
+import { fetchSimilarProducts, trackProductView } from '../api/recommendationApi';
+import FrequentlyBoughtTogether from '../components/FrequentlyBoughtTogether';
+import RecentlyViewedSection from '../components/RecentlyViewedSection';
 import { Star } from 'lucide-react';
 import ReviewSection from '../../review/components/ReviewSection';
 import QuestionSection from '../../review/components/QuestionSection';
@@ -35,6 +37,14 @@ const ProductDetailPage = () => {
       .finally(() => {
         if (isMounted) setSimilarLoading(false);
       });
+
+    // Telemetry: Track user product view
+    let sessionId = localStorage.getItem('icrowd_session_id');
+    if (!sessionId) {
+      sessionId = 'sess_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('icrowd_session_id', sessionId);
+    }
+    trackProductView(id, sessionId, 'VIEW');
 
     return () => { isMounted = false; };
   }, [id]);
@@ -140,6 +150,9 @@ const ProductDetailPage = () => {
       {/* 2. Technical Specifications */}
       <ProductSpecs specifications={product.specifications} />
 
+      {/* AI Frequently Bought Together Bundle */}
+      <FrequentlyBoughtTogether productId={id} />
+
       <ReviewSection key={'reviews-' + id} productId={id} onChanged={refresh} />
       <QuestionSection key={'questions-' + id} productId={id} />
 
@@ -150,6 +163,9 @@ const ProductDetailPage = () => {
         title="You May Also Like"
         subtitle="Related products matched to this item and your taste."
       />
+
+      {/* 4. AI Browsing History: Recently Viewed Products */}
+      <RecentlyViewedSection currentProductId={id} />
 
     </div>
   );

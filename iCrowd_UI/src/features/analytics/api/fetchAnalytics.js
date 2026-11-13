@@ -10,6 +10,8 @@ export const fetchAnalyticsSummary = async (params = {}) => {
     if (params.range) cleanParams.range = params.range;
     if (params.startDate) cleanParams.startDate = params.startDate;
     if (params.endDate) cleanParams.endDate = params.endDate;
+    if (params.demo !== undefined) cleanParams.demo = params.demo;
+    if (params.grain) cleanParams.grain = params.grain;
 
     const response = await apiClient.get('/analytics/summary', { params: cleanParams });
     return response.data;

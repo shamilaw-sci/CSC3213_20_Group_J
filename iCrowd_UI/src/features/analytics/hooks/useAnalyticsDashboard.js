@@ -11,6 +11,8 @@ export const useAnalyticsDashboard = (initialRange = 'all') => {
   const [range, setRange] = useState(initialRange);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [demoMode, setDemoMode] = useState(false);
+  const [grain, setGrain] = useState('monthly');
 
   const loadData = useCallback(async () => {
     try {
@@ -21,6 +23,12 @@ export const useAnalyticsDashboard = (initialRange = 'all') => {
         params.startDate = customStartDate;
         params.endDate = customEndDate;
       }
+      if (demoMode) {
+        params.demo = true;
+      }
+      if (grain) {
+        params.grain = grain;
+      }
       const result = await fetchAnalyticsSummary(params);
       setData(result);
     } catch (err) {
@@ -28,7 +36,7 @@ export const useAnalyticsDashboard = (initialRange = 'all') => {
     } finally {
       setLoading(false);
     }
-  }, [range, customStartDate, customEndDate]);
+  }, [range, customStartDate, customEndDate, demoMode]);
 
   useEffect(() => {
     loadData();
@@ -48,6 +56,10 @@ export const useAnalyticsDashboard = (initialRange = 'all') => {
     setRange,
     customStartDate,
     customEndDate,
+    demoMode,
+    setDemoMode,
+    grain,
+    setGrain,
     applyCustomRange: handleApplyCustomRange,
     refresh: loadData,
   };

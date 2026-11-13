@@ -12,6 +12,12 @@ const AIChatbot = () => {
     sendMessage,
     clearChat,
     messagesEndRef,
+    geminiApiKey,
+    saveGeminiKey,
+    isGeminiActive,
+    toggleGemini,
+    showSettings,
+    setShowSettings,
   } = useAIChatbot();
 
   return (
@@ -25,6 +31,12 @@ const AIChatbot = () => {
         onSend={sendMessage}
         onClear={clearChat}
         messagesEndRef={messagesEndRef}
+        geminiApiKey={geminiApiKey}
+        onSaveGeminiKey={saveGeminiKey}
+        isGeminiActive={isGeminiActive}
+        onToggleGemini={toggleGemini}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
       />
     </>
   );

@@ -32,25 +32,48 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const SalesForecastChart = ({ data = [] }) => {
+const SalesForecastChart = ({ data = [], grain = 'monthly', onSelectGrain }) => {
   return (
-    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-xl shadow-black/20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <span>📈</span> Monthly Sales vs. AI Demand Forecast
+            <span>📈</span> {grain.charAt(0).toUpperCase() + grain.slice(1)} Sales vs. AI Demand Forecast
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             Actual historic volume vs. Next-period AI projected trajectory (2026)
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">
-            <span className="w-2 h-2 rounded-full bg-indigo-400"></span> Actual Sales
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span> AI Forecast
-          </span>
+
+        {/* Time Granularity Selector & Legend */}
+        <div className="flex flex-wrap items-center gap-3">
+          {onSelectGrain && (
+            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700/80">
+              {['daily', 'weekly', 'monthly'].map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => onSelectGrain(g)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
+                    grain === g
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-indigo-400"></span> Actual Sales
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span> AI Forecast
+            </span>
+          </div>
         </div>
       </div>
 

@@ -55,7 +55,16 @@ const ChatMessageItem = ({ message }) => {
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.text}</p>
           ) : (
-            <div className="space-y-1">{renderFormattedText(message.text)}</div>
+            <div className="space-y-1">
+              {renderFormattedText(message.text)}
+              {message.isGemini && (
+                <div className="pt-1.5 border-t border-purple-100 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                    ✨ Google Gemini AI
+                  </span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
