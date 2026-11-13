@@ -70,11 +70,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, org.spr
     @Query("SELECT p FROM Product p ORDER BY p.createdAt DESC")
     List<Product> findRecentProducts(Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.category.id IN :categoryIds ORDER BY p.averageRating DESC")
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.availableStock > 0 AND p.category.id IN :categoryIds ORDER BY ((COALESCE(p.averageRating, 0) * COALESCE(p.reviewCount, 0) + 15.0) / (COALESCE(p.reviewCount, 0) + 5.0)) DESC, p.id ASC")
     Page<Product> findTopProductsByCategories(@Param("categoryIds") List<Long> categoryIds, Pageable pageable);
 
     // Similar products in same category, excluding a specific product
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.category.id = :categoryId AND p.id != :excludeId ORDER BY p.averageRating DESC")
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.availableStock > 0 AND p.category.id = :categoryId AND p.id != :excludeId ORDER BY ((COALESCE(p.averageRating, 0) * COALESCE(p.reviewCount, 0) + 15.0) / (COALESCE(p.reviewCount, 0) + 5.0)) DESC, p.id ASC")
     Page<Product> findSimilarProductsByCategory(
             @Param("categoryId") Long categoryId,
             @Param("excludeId") Long excludeId,

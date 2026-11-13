@@ -35,6 +35,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
                 // Public auth endpoints
+                .requestMatchers("/api/marketing/unsubscribe").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 // Public AI Chatbot endpoints
                 .requestMatchers("/api/ai/**").permitAll()

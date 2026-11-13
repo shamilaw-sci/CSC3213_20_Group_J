@@ -1,3 +1,4 @@
+import EmailPreferences from '../components/EmailPreferences';
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useUserProfile } from '../hooks/useUserProfile';
@@ -135,6 +136,7 @@ const ProfilePage = () => {
 
                                 {/* Row 3: Promotions & Vouchers */}
                                 <PromotionsCard />
+                                <EmailPreferences />
                             </div>
                         )}
 
@@ -284,6 +286,7 @@ const ProfilePage = () => {
                                 </div>
 
                                 <PromotionsCard />
+                                <EmailPreferences />
                             </div>
                         )}
 

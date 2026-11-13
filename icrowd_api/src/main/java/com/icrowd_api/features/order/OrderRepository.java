@@ -30,7 +30,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'COMPLETED', 'DELIVERED')")
     long countCompletedOrdersByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId")
+    @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')")
     List<Long> findUserPurchasedCategoryIds(@Param("userId") Long userId);
 
     @Query("SELECT DISTINCT o FROM Order o " +
@@ -55,4 +55,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Modifying
     @Query("UPDATE Order o SET o.createdAt = :createdAt WHERE o.id = :id")
     int updateOrderCreatedAt(@Param("id") Long id, @Param("createdAt") java.time.LocalDateTime createdAt);
+    @Query("SELECT DISTINCT oi.product.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')")
+    List<Long> findUserPurchasedProductIds(@Param("userId") Long userId);
 }
