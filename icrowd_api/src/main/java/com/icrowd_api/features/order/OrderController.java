@@ -24,6 +24,7 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
+    @Autowired private ReceiptService receipts;
 
     private final String UPLOAD_DIR = "uploads/";
 
@@ -71,10 +72,6 @@ public class OrderController {
             return ResponseEntity.badRequest().body(
                 Map.of("error", "VALIDATION_FAILED", "message", e.getMessage())
             );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                Map.of("error", "ERROR", "message", e.getMessage() != null ? e.getMessage() : "Order creation failed")
-            );
         }
     }
 
@@ -92,7 +89,8 @@ public class OrderController {
             String email = authentication.getName();
             PaymentStatusResponse response = orderService.getPaymentStatus(id, email);
             return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
+        } catch (org.springframework.web.server.ResponseStatusException e) { throw e;
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "ERROR", "message", e.getMessage()));
         }
     }
@@ -120,10 +118,6 @@ public class OrderController {
             return ResponseEntity.badRequest().body(
                 Map.of("error", "VALIDATION_FAILED", "message", e.getMessage())
             );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                Map.of("error", "ERROR", "message", e.getMessage() != null ? e.getMessage() : "Validation failed")
-            );
         }
     }
 
@@ -131,22 +125,8 @@ public class OrderController {
      * Legacy checkout endpoint for backward compatibility.
      */
     @PostMapping("/checkout")
-    public ResponseEntity<?> checkout(Authentication authentication, @RequestBody CheckoutRequest request) {
-        if (authentication == null) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-        
-        try {
-            String email = authentication.getName();
-            Order order = orderService.createOrder(email, request);
-            return ResponseEntity.ok(order);
-        } catch (OutOfStockException e) {
-            return ResponseEntity.status(409).body(
-                Map.of("error", "OUT_OF_STOCK", "productId", e.getProductId())
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<?> checkout() {
+        return ResponseEntity.status(410).body(Map.of("message", "Use the current checkout flow to provide complete delivery details."));
     }
 
     /**
@@ -154,56 +134,11 @@ public class OrderController {
      * BOLA ownership check: only the order owner or an ADMIN may upload.
      */
     @PostMapping("/{id}/receipt")
-    public ResponseEntity<?> uploadReceipt(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication) {
-
-        if (authentication == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
-        }
-
-        // Ownership / ADMIN bypass check
-        Order order = orderService.findById(id);
-        if (order == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        boolean isAdmin = authentication.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
-        boolean isOwner = order.getUser() != null && order.getUser().getEmail() != null &&
-                order.getUser().getEmail().equals(authentication.getName());
-
-        if (!isAdmin && !isOwner) {
-            return ResponseEntity.status(403).body(Map.of("message", "Access denied: not your order"));
-        }
-
-        try {
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body("File is empty");
-            }
-
-            Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
-            String fileExtension = "";
-            int i = originalFileName.lastIndexOf('.');
-            if (i > 0) {
-                fileExtension = originalFileName.substring(i);
-            }
-            String fileName = UUID.randomUUID().toString() + fileExtension;
-
-            Path filePath = uploadPath.resolve(fileName);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            String fileUrl = "/uploads/" + fileName;
-            orderService.updateReceiptUrl(id, fileUrl);
-
-            return ResponseEntity.ok(fileUrl);
-        } catch (IOException e) {
-            return ResponseEntity.internalServerError().body("Could not upload file: " + e.getMessage());
-        }
+    public ResponseEntity<String> uploadReceipt(@PathVariable Long id, @RequestParam("file") MultipartFile file, Authentication actor) throws IOException {
+        return ResponseEntity.ok(receipts.save(id,file,actor));
+    }
+    @GetMapping("/{id}/receipt")
+    public ResponseEntity<byte[]> downloadReceipt(@PathVariable Long id, Authentication actor) throws IOException {
+        return receipts.download(id,actor);
     }
 }

@@ -24,6 +24,9 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
+
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -33,9 +36,19 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
+            .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
+                response.setStatus(401);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Please sign in to continue.\"}");
+            }).accessDeniedHandler((request, response, exception) -> {
+                response.setStatus(403);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Access denied: insufficient permissions.\"}");
+            }))
             .authorizeHttpRequests(authz -> authz
                 // Public auth endpoints
-                .requestMatchers("/api/marketing/unsubscribe").permitAll()
+                .requestMatchers("/api/marketing/unsubscribe", "/api/marketing/confirm").permitAll()
+                .requestMatchers("/uploads/**").denyAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 // Public AI Chatbot endpoints
                 .requestMatchers("/api/ai/**").permitAll()
@@ -102,11 +115,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000"
-        ));
+        configuration.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(origin -> !origin.isEmpty()).peek(origin -> {
+                    var uri = java.net.URI.create(origin);
+                    if (!java.util.Set.of("http", "https").contains(uri.getScheme()) || uri.getHost() == null
+                            || uri.getUserInfo() != null || (uri.getPath() != null && !uri.getPath().isEmpty())
+                            || uri.getQuery() != null || uri.getFragment() != null)
+                        throw new IllegalStateException("CORS origins must be explicit http(s) origins.");
+                }).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

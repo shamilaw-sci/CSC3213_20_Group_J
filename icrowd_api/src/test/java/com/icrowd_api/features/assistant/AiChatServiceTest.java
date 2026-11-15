@@ -89,7 +89,7 @@ class AiChatServiceTest {
                 .build();
 
         List<Product> allProducts = List.of(inStockHeadset, inStockPowerBank, inStockCase, outOfStockHeadset);
-        when(productRepository.findAllActiveProductsList()).thenReturn(allProducts);
+        when(productRepository.findCatalogCandidates(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class))).thenReturn(allProducts);
     }
 
     @Nested

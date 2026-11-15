@@ -9,7 +9,6 @@ const AddressBookCard = ({
     defaultAddress,
     onAddClick,
     onEditAddress,
-    onDeleteAddress,
     onManageAllClick
 }) => {
     return (

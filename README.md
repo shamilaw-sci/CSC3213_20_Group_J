@@ -1,5 +1,11 @@
 # iCrowd E-commerce Platform
 
+See [setup and deployment](docs/deployment.md) before starting the API. Persistent deployments now require explicit database settings and a private signing secret; sample accounts and fake orders are disabled by default. The [15 November remediation report](docs/remediation-2026-11-15.md) records the security fixes, verification results, and upgrade requirements.
+
+For the prepared Windows workspace using the existing Neon database, follow [the local running guide](docs/run-with-neon.md). Run `.\scripts\start-local.ps1` from the project folder to start both servers, open **http://localhost:5173**, and use `.\scripts\stop-local.ps1` to stop them.
+
+See [what belongs in Git](docs/repository-files.md) before committing logs, backups, environment files, or generated output.
+
 ## Introduction
 Welcome to the iCrowd E-commerce Platform! This project is a centralized digital storefront built specifically for phone accessories. It is designed to upgrade traditional retail operations into a fully scalable, digital experience, providing an easy-to-use shopping interface for customers and powerful inventory management tools for store administrators.
 

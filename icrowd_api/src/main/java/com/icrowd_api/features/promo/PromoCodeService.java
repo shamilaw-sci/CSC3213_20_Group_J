@@ -37,6 +37,7 @@ public class PromoCodeService {
 
     @Transactional
     public PromoCodeResponse createPromoCode(PromoCodeRequest req) {
+        validateRequest(req);
         if (promoCodeRepository.existsByCodeIgnoreCase(req.getCode())) {
             throw new PromoCodeInvalidException("A promo code with that name already exists.");
         }
@@ -63,7 +64,8 @@ public class PromoCodeService {
 
     @Transactional
     public PromoCodeResponse updatePromoCode(Long id, PromoCodeRequest req) {
-        PromoCode promo = promoCodeRepository.findById(id)
+        validateRequest(req);
+        PromoCode promo = promoCodeRepository.lockById(id)
                 .orElseThrow(() -> new PromoCodeNotFoundException(id));
 
         // Check uniqueness only if code changed
@@ -92,7 +94,7 @@ public class PromoCodeService {
 
     @Transactional
     public PromoCodeResponse toggleActive(Long id) {
-        PromoCode promo = promoCodeRepository.findById(id)
+        PromoCode promo = promoCodeRepository.lockById(id)
                 .orElseThrow(() -> new PromoCodeNotFoundException(id));
         promo.setActive(!promo.getActive());
         return PromoCodeResponse.from(promoCodeRepository.save(promo));
@@ -128,7 +130,7 @@ public class PromoCodeService {
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
                 .filter(p -> p.getStartDate() == null || !p.getStartDate().isAfter(today))
                 .filter(p -> p.getExpiryDate() == null || !p.getExpiryDate().isBefore(today))
-                .filter(p -> p.getTotalUsageLimit() == null || promoCodeUsageRepository.countConfirmedByPromoCode(p) < p.getTotalUsageLimit())
+                .filter(p -> p.getTotalUsageLimit() == null || promoCodeUsageRepository.countReserved(p, null, null, java.time.LocalDateTime.now().minusHours(24)) < p.getTotalUsageLimit())
                 .filter(p -> {
                     // Check customer eligibility
                     if (p.getCustomerEligibility() == CustomerEligibility.NEW_CUSTOMERS) {
@@ -144,7 +146,7 @@ public class PromoCodeService {
                     }
                     // Check per customer limit
                     if (user != null && p.getPerCustomerLimit() != null) {
-                        long usedByCustomer = promoCodeUsageRepository.countByPromoCodeAndCustomer(p, user);
+                        long usedByCustomer = promoCodeUsageRepository.countReserved(p, user, null, java.time.LocalDateTime.now().minusHours(24));
                         if (usedByCustomer >= p.getPerCustomerLimit()) return false;
                     }
                     return true;
@@ -198,7 +200,7 @@ public class PromoCodeService {
         if (promo.getExpiryDate() != null && promo.getExpiryDate().isBefore(today)) {
             return fail("This promo code has expired.");
         }
-        long confirmedUsages = promoCodeUsageRepository.countConfirmedByPromoCode(promo);
+        long confirmedUsages = promoCodeUsageRepository.countReserved(promo, null, null, java.time.LocalDateTime.now().minusHours(24));
         if (promo.getTotalUsageLimit() != null && confirmedUsages >= promo.getTotalUsageLimit()) {
             return fail("This promo code has reached its usage limit.");
         }
@@ -231,7 +233,7 @@ public class PromoCodeService {
 
             // Per-customer limit
             if (promo.getPerCustomerLimit() != null) {
-                long usedByCustomer = promoCodeUsageRepository.countByPromoCodeAndCustomer(promo, user);
+                long usedByCustomer = promoCodeUsageRepository.countReserved(promo, user, null, java.time.LocalDateTime.now().minusHours(24));
                 if (usedByCustomer >= promo.getPerCustomerLimit()) {
                     return fail("You have already used this promo code the maximum number of times.");
                 }
@@ -273,7 +275,7 @@ public class PromoCodeService {
 
     private BigDecimal calculateDiscount(PromoCode promo, BigDecimal subTotal) {
         if (promo.getDiscountType() == DiscountType.FIXED) {
-            return promo.getDiscountValue().min(subTotal);
+            return promo.getDiscountValue().max(BigDecimal.ZERO).min(subTotal);
         }
         // PERCENTAGE
         BigDecimal discount = subTotal
@@ -282,7 +284,7 @@ public class PromoCodeService {
         if (promo.getMaxDiscountAmount() != null) {
             discount = discount.min(promo.getMaxDiscountAmount());
         }
-        return discount;
+        return discount.max(BigDecimal.ZERO).min(subTotal);
     }
 
     private PromoValidationResponse fail(String message) {
@@ -291,5 +293,46 @@ public class PromoCodeService {
                 .message(message)
                 .discountAmount(BigDecimal.ZERO)
                 .build();
+    }
+
+    private void validateRequest(PromoCodeRequest r) {
+        if (r == null || r.getCode() == null || r.getCode().isBlank() || r.getCode().trim().length() > 50
+                || r.getDiscountType() == null || r.getDiscountValue() == null || r.getDiscountValue().signum() < 0
+                || r.getDiscountValue().compareTo(new BigDecimal("99999999.99")) > 0
+                || (r.getDiscountType() == DiscountType.PERCENTAGE && r.getDiscountValue().compareTo(new BigDecimal("100")) > 0)
+                || (r.getMaxDiscountAmount() != null && r.getMaxDiscountAmount().signum() < 0)
+                || (r.getMinimumOrderAmount() != null && r.getMinimumOrderAmount().signum() < 0)
+                || (r.getTotalUsageLimit() != null && r.getTotalUsageLimit() < 1)
+                || (r.getPerCustomerLimit() != null && r.getPerCustomerLimit() < 1)
+                || (r.getStartDate() != null && r.getExpiryDate() != null && r.getStartDate().isAfter(r.getExpiryDate())))
+            throw new PromoCodeInvalidException("Enter a valid discount (percentage 0–100), positive limits and an ordered date range.");
+        if (r.getCustomerEligibility() == CustomerEligibility.SELECTED_CUSTOMERS &&
+                (r.getEligibleCustomerEmails() == null || r.getEligibleCustomerEmails().isEmpty()))
+            throw new PromoCodeInvalidException("Select at least one eligible customer.");
+    }
+
+    @Transactional
+    public PromoValidationResponse lockAndValidateCode(String code, String email, BigDecimal subtotal) {
+        promoCodeRepository.lockByCode(code.trim()).orElseThrow(() -> new PromoCodeNotFoundException(code));
+        return validateCode(code, email, subtotal);
+    }
+
+    // The caller holds the order lock; promotion locks always precede product locks.
+    @Transactional
+    public boolean confirmReservation(Order order) {
+        if (order.getAppliedPromoCode() == null) return true;
+        PromoCode p = promoCodeRepository.lockById(order.getAppliedPromoCode().getId()).orElse(null);
+        if (p == null || !Boolean.TRUE.equals(p.getActive())) return false;
+        LocalDate today = LocalDate.now();
+        if ((p.getStartDate() != null && p.getStartDate().isAfter(today))
+                || (p.getExpiryDate() != null && p.getExpiryDate().isBefore(today))) return false;
+        var cutoff = java.time.LocalDateTime.now().minusHours(24);
+        if (p.getTotalUsageLimit() != null && promoCodeUsageRepository.countReserved(p, null, order.getId(), cutoff) >= p.getTotalUsageLimit()) return false;
+        if (p.getPerCustomerLimit() != null && promoCodeUsageRepository.countReserved(p, order.getUser(), order.getId(), cutoff) >= p.getPerCustomerLimit()) return false;
+        if (p.getCustomerEligibility() == CustomerEligibility.SELECTED_CUSTOMERS &&
+                p.getEligibleCustomerEmails().stream().noneMatch(e -> e.equalsIgnoreCase(order.getUser().getEmail()))) return false;
+        if (p.getCustomerEligibility() == CustomerEligibility.NEW_CUSTOMERS &&
+                orderRepository.countCompletedOrdersByUserId(order.getUser().getId()) > 0) return false;
+        return true;
     }
 }

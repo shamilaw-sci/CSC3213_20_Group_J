@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getAdminOrders, updateAdminOrderStatus, getAdminOrderStats } from '../api/adminOrderApi';
 import OrderFulfillmentModal from '../components/OrderFulfillmentModal';
 import OrderDetailModal from '../components/OrderDetailModal';
@@ -73,6 +73,8 @@ const AdminOrders = () => {
     // Filters and pagination
     const [activeStatus, setActiveStatus] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const activeRequest = useRef(null);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
@@ -84,19 +86,23 @@ const AdminOrders = () => {
 
     // Load orders
     const fetchOrders = useCallback(async () => {
+        activeRequest.current?.abort();
+        const controller = new AbortController();
+        activeRequest.current = controller;
         setLoading(true);
         setError(null);
         try {
-            const data = await getAdminOrders(page, 15, searchTerm, activeStatus);
+            const data = await getAdminOrders(page, 15, debouncedSearch, activeStatus, controller.signal);
+            if (controller.signal.aborted) return;
             setOrders(data.content || []);
             setTotalPages(data.totalPages || 0);
             setTotalElements(data.totalElements || 0);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to load orders.');
+            if (!controller.signal.aborted) setError(err.response?.data?.message || 'Failed to load orders.');
         } finally {
-            setLoading(false);
+            if (!controller.signal.aborted) setLoading(false);
         }
-    }, [page, searchTerm, activeStatus]);
+    }, [page, debouncedSearch, activeStatus]);
 
     // Load stats
     const fetchStats = async () => {
@@ -110,7 +116,13 @@ const AdminOrders = () => {
 
     useEffect(() => {
         fetchOrders();
+        return () => activeRequest.current?.abort();
     }, [fetchOrders]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => { setDebouncedSearch(searchTerm.trim()); setPage(0); }, 250);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         fetchStats();
@@ -119,7 +131,7 @@ const AdminOrders = () => {
     const handleSearchSubmit = (e) => {
         e.preventDefault();
         setPage(0);
-        fetchOrders();
+        setDebouncedSearch(searchTerm.trim());
     };
 
     const handleStatusTabClick = (status) => {
@@ -228,6 +240,7 @@ const AdminOrders = () => {
                             type="text"
                             placeholder="Search by order ref (e.g. ORD-...), recipient name, phone, or email…"
                             value={searchTerm}
+                            maxLength={200}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-9 pr-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 transition-all"
                         />

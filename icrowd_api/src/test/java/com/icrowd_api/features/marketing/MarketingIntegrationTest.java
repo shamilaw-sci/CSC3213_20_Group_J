@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.*;
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:marketing;DB_CLOSE_DELAY=-1;MODE=PostgreSQL", "spring.jpa.hibernate.ddl-auto=create-drop", "app.marketing.interval-ms=3600000"})
 class MarketingIntegrationTest {
     @Autowired MarketingService service;
+    @Autowired SubscriptionConfirmation confirmation;
     @Autowired MarketingWorker worker;
     @Autowired MarketingProperties config;
     @Autowired CampaignRecorder recorder;
@@ -46,20 +47,26 @@ class MarketingIntegrationTest {
         Category category=categories.save(Category.builder().name("Audio "+suffix).build());
         product=products.save(Product.builder().sku(suffix).name("Office headphones").category(category).price(BigDecimal.valueOf(5000)).availableStock(10).tags(List.of("office")).brand("Sony").build());
         service.savePreference(user.getEmail(),new MarketingService.PreferenceView(true,"office","Sony"));
+        var confirmationMessage=org.mockito.ArgumentCaptor.forClass(org.springframework.mail.SimpleMailMessage.class);
+        verify(mail).send(confirmationMessage.capture());
+        var token=java.util.regex.Pattern.compile("token=([a-f0-9]{64})").matcher(confirmationMessage.getValue().getText());
+        assertTrue(token.find()); assertTrue(confirmation.confirm(token.group(1))); clearInvocations(mail);
         recorder.record("PRODUCT",product.getId()); campaignId=campaigns.findTop30ByOrderByIdDesc().get(0).getId();
         when(mail.createMimeMessage()).thenAnswer(inv -> new MimeMessage((Session)null));
     }
+    void prepareOnly() { config.setEnabled(true); service.prepare(); config.setEnabled(false); }
+    @Test void disabledWorkerDoesNotPrepareOrSend() { worker.tick();assertEquals(0,deliveries.count());verify(mail,never()).send(any(MimeMessage.class)); }
     @AfterEach void disable() { config.setEnabled(false); }
     @Test void optInMatchingAndDeduplication() {
         recorder.record("PRODUCT",product.getId());
         assertEquals(1,campaigns.count());
         assertEquals(1,service.audience(campaignId).size());
-        worker.tick(); worker.tick();
+        prepareOnly(); prepareOnly();
         assertEquals(1,deliveries.count());
         verify(mail,never()).send(any(MimeMessage.class));
     }
     @Test void unsubscribeSuppressesQueuedEmail() {
-        worker.tick();
+        prepareOnly();
         String token=preferences.findById(user.getId()).orElseThrow().getUnsubscribeToken();
         service.unsubscribe(token); config.setEnabled(true); worker.tick();
         assertEquals("SKIPPED",deliveries.findAll().get(0).getStatus());
@@ -76,7 +83,7 @@ class MarketingIntegrationTest {
         assertEquals(1,attempts.count());
     }
     @Test void unavailableProductIsSuppressedBeforeSend() {
-        worker.tick(); product.setAvailableStock(0); products.save(product); config.setEnabled(true); worker.tick();
+        prepareOnly(); product.setAvailableStock(0); products.save(product); config.setEnabled(true); worker.tick();
         assertEquals("SKIPPED",deliveries.findAll().get(0).getStatus()); verify(mail,never()).send(any(MimeMessage.class));
     }
     @Test void rollingLimitsLeaveEmailsQueued() {
@@ -96,7 +103,7 @@ class MarketingIntegrationTest {
         assertTrue(service.audience(campaignId).isEmpty());
         service.savePreference(user.getEmail(),new MarketingService.PreferenceView(true,"office",""));
         assertEquals(1,service.audience(campaignId).size());
-        tx.executeWithoutResult(status -> orders.findById(order.getId()).orElseThrow().setStatus(OrderStatus.COMPLETED));
+        tx.executeWithoutResult(status -> { var saved=orders.findById(order.getId()).orElseThrow();saved.setStatus(OrderStatus.COMPLETED);saved.setPaymentStatus(PaymentStatus.PAID); });
         assertTrue(service.audience(campaignId).isEmpty());
     }
     @Test void selectedCustomerPromotionDoesNotLeakToOthers() {

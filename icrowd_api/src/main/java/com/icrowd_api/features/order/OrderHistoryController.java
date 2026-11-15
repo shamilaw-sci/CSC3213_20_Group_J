@@ -17,12 +17,12 @@ public class OrderHistoryController {
                           String address, String district, List<Item> items) {}
     @GetMapping("/api/orders")
     @Transactional(readOnly = true)
-    public List<History> history(Authentication authentication) {
-        return orders.findByUserEmailOrderByCreatedAtDesc(authentication.getName()).stream().map(order ->
+    public org.springframework.data.domain.Page<History> history(Authentication authentication, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) {
+        return orders.findByUserEmailOrderByCreatedAtDesc(authentication.getName(),org.springframework.data.domain.PageRequest.of(Math.max(0,page),Math.max(1,Math.min(50,size)))).map(order ->
             new History(order.getId(), order.getOrderReference(), order.getCreatedAt(), order.getStatus(),
                 order.getPaymentStatus(), order.getPaymentMethod(), order.getTotalAmount(), order.getShippingAddress(),
                 order.getShippingDistrict(), order.getItems().stream().map(item -> new Item(item.getProduct().getId(),
                     item.getProduct().getName(), item.getQuantity(), item.getPriceAtTimeOfPurchase())).toList())
-        ).toList();
+        );
     }
 }

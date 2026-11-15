@@ -13,7 +13,6 @@ const ChatWindow = ({
   geminiApiKey = '',
   onSaveGeminiKey,
   isGeminiActive = false,
-  onToggleGemini,
   showSettings = false,
   setShowSettings,
 }) => {

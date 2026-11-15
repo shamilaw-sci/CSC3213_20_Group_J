@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { clearSession } from '../../../lib/session';
+import { useNavigate } from 'react-router-dom';
 import { changePassword } from '../api/userApi';
 
 /**
@@ -6,6 +8,7 @@ import { changePassword } from '../api/userApi';
  * Handles password change form state, validation, and API submission.
  */
 export const useChangePassword = (onSuccess) => {
+    const navigate = useNavigate();
     const [passwordData, setPasswordData] = useState({
         currentPassword: '',
         newPassword: '',
@@ -54,7 +57,8 @@ export const useChangePassword = (onSuccess) => {
                 confirmPassword: ''
             });
             if (onSuccess) onSuccess();
-            setTimeout(() => setSuccessMessage(''), 4000);
+            clearSession();
+            navigate('/login', { replace: true, state: { message: 'Password changed. Please sign in with your new password.' } });
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to change password. Please check your current password.');
         } finally {

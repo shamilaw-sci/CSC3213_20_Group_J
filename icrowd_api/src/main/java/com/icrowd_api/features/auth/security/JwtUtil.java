@@ -10,8 +10,6 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,29 +20,21 @@ public class JwtUtil {
 
     private static final String DEFAULT_SECRET = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
 
-    @Value("${jwt.secret:" + DEFAULT_SECRET + "}")
+    @Value("${jwt.secret:}")
     private String secretKeyString;
 
     @Value("${jwt.expiration-ms:86400000}")
     private long jwtTokenValidity = 24 * 60 * 60 * 1000; // 24 hours default
 
-    private SecretKey secretKey = Keys.hmacShaKeyFor(DEFAULT_SECRET.getBytes(StandardCharsets.UTF_8));
+    private SecretKey secretKey;
 
     @PostConstruct
     public void init() {
-        byte[] keyBytes = DEFAULT_SECRET.getBytes(StandardCharsets.UTF_8);
-        if (secretKeyString != null && !secretKeyString.isBlank()) {
-            keyBytes = secretKeyString.getBytes(StandardCharsets.UTF_8);
-            if (keyBytes.length < 32) {
-                try {
-                    MessageDigest md = MessageDigest.getInstance("SHA-256");
-                    keyBytes = md.digest(keyBytes);
-                } catch (NoSuchAlgorithmException ignored) {
-                    keyBytes = DEFAULT_SECRET.getBytes(StandardCharsets.UTF_8);
-                }
-            }
+        if (secretKeyString == null || secretKeyString.isBlank() || DEFAULT_SECRET.equals(secretKeyString)
+                || secretKeyString.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT_SECRET must be a unique secret with at least 32 bytes.");
         }
-        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+        this.secretKey = Keys.hmacShaKeyFor(secretKeyString.getBytes(StandardCharsets.UTF_8));
     }
 
     public String extractUsername(String token) {
@@ -74,7 +64,7 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    private Claims extractAllClaims(String token) {
+    public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token).getBody();
     }
 

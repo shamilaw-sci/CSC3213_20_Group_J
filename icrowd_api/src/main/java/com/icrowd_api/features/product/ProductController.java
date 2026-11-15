@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@org.springframework.transaction.annotation.Transactional(readOnly=true)
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 public class ProductController {
 
     private final ProductService productService;
@@ -24,7 +24,7 @@ public class ProductController {
     // ── Public (Customer-facing) ───────────────────────────────────────────────
 
     @GetMapping
-    public ResponseEntity<Page<Product>> getProducts(
+    public ResponseEntity<Page<CatalogProduct>> getProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String sort,
@@ -35,7 +35,7 @@ public class ProductController {
             @RequestParam(required = false) String brand,
             @RequestParam(defaultValue = "false") boolean inStock,
             @RequestParam(required = false) Double minRating) {
-        return ResponseEntity.ok(productService.browse(keyword, category, sort, page, size, minPrice, maxPrice, brand, inStock, minRating, false));
+        return ResponseEntity.ok(productService.browse(keyword, category, sort, page, size, minPrice, maxPrice, brand, inStock, minRating, false).map(CatalogProduct::summary));
     }
 
     @GetMapping("/brands")
@@ -44,9 +44,9 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+    public ResponseEntity<CatalogProduct> getProductById(@PathVariable Long id) {
         try {
-            return ResponseEntity.ok(productService.getProductById(id));
+            return ResponseEntity.ok(CatalogProduct.detail(productService.getProductById(id)));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -58,38 +58,38 @@ public class ProductController {
     }
 
     @GetMapping("/recommendations")
-    public ResponseEntity<List<Product>> getRecommendations(
+    public ResponseEntity<List<CatalogProduct>> getRecommendations(
             Authentication authentication,
             @RequestParam(defaultValue = "10") int limit) {
-        return ResponseEntity.ok(productService.getRecommendedProducts(resolveUserEmail(authentication), limit));
+        return ResponseEntity.ok(productService.getRecommendedProducts(resolveUserEmail(authentication), limit).stream().map(CatalogProduct::summary).toList());
     }
 
     @GetMapping("/featured")
-    public ResponseEntity<List<Product>> getFeatured(
+    public ResponseEntity<List<CatalogProduct>> getFeatured(
             @RequestParam(defaultValue = "6") int limit) {
-        return ResponseEntity.ok(productService.getFeaturedProducts(limit));
+        return ResponseEntity.ok(productService.getFeaturedProducts(limit).stream().map(CatalogProduct::summary).toList());
     }
 
     @GetMapping("/latest")
-    public ResponseEntity<List<Product>> getLatest(
+    public ResponseEntity<List<CatalogProduct>> getLatest(
             @RequestParam(defaultValue = "6") int limit) {
-        return ResponseEntity.ok(productService.getLatestProducts(limit));
+        return ResponseEntity.ok(productService.getLatestProducts(limit).stream().map(CatalogProduct::summary).toList());
     }
 
     @GetMapping("/{id}/similar")
-    public ResponseEntity<List<Product>> getSimilar(
+    public ResponseEntity<List<CatalogProduct>> getSimilar(
             @PathVariable Long id,
             Authentication authentication,
             @RequestParam(defaultValue = "6") int limit) {
-        return ResponseEntity.ok(productService.getSimilarProducts(id, resolveUserEmail(authentication), limit));
+        return ResponseEntity.ok(productService.getSimilarProducts(id, resolveUserEmail(authentication), limit).stream().map(CatalogProduct::summary).toList());
     }
 
     @GetMapping("/cart-suggestions")
-    public ResponseEntity<List<Product>> getCartSuggestions(
+    public ResponseEntity<List<CatalogProduct>> getCartSuggestions(
             @RequestParam(required = false) List<Long> productIds,
             Authentication authentication,
             @RequestParam(defaultValue = "6") int limit) {
-        return ResponseEntity.ok(productService.getCartSuggestions(productIds, resolveUserEmail(authentication), limit));
+        return ResponseEntity.ok(productService.getCartSuggestions(productIds, resolveUserEmail(authentication), limit).stream().map(CatalogProduct::summary).toList());
     }
 
     private String resolveUserEmail(Authentication authentication) {
@@ -105,10 +105,10 @@ public class ProductController {
 
     @GetMapping("/admin/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
-    public ResponseEntity<Page<Product>> getAllProductsForAdmin(
+    public ResponseEntity<Page<AdminProductView>> getAllProductsForAdmin(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(productService.browse(keyword, null, "newest", page, size, null, null, null, false, null, true));
+        return ResponseEntity.ok(productService.browse(keyword, null, "newest", page, size, null, null, null, false, null, true).map(AdminProductView::from));
     }
 
     @GetMapping("/admin/stats")
@@ -133,26 +133,30 @@ public class ProductController {
 
     @GetMapping("/admin/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
-    public ResponseEntity<Product> getProductByIdForAdmin(@PathVariable Long id) {
+    public ResponseEntity<AdminProductView> getProductByIdForAdmin(@PathVariable Long id) {
         try {
-            return ResponseEntity.ok(productService.getProductByIdForAdmin(id));
+            return ResponseEntity.ok(AdminProductView.from(productService.getProductByIdForAdmin(id)));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<?> createProduct(@RequestBody ProductRequest request, Authentication authentication) {
         try {
             String actorEmail = authentication != null ? authentication.getName() : "SYSTEM";
             Product created = productService.createProduct(request, actorEmail);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+            return ResponseEntity.status(HttpStatus.CREATED).body(AdminProductView.from(created));
+        } catch (org.springframework.web.server.ResponseStatusException | org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<?> updateProduct(@PathVariable Long id,
@@ -161,18 +165,23 @@ public class ProductController {
         try {
             String actorEmail = authentication != null ? authentication.getName() : "SYSTEM";
             Product updated = productService.updateProduct(id, request, actorEmail);
-            return ResponseEntity.ok(updated);
+            return ResponseEntity.ok(AdminProductView.from(updated));
+        } catch (org.springframework.web.server.ResponseStatusException | org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         try {
             productService.softDeleteProduct(id);
             return ResponseEntity.ok(Map.of("message", "Product deactivated successfully"));
+        } catch (org.springframework.web.server.ResponseStatusException | org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

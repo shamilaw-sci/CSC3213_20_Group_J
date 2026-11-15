@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { formatLkr } from '../../../lib/currency';
 
 export default function ProductCard({ product }) {

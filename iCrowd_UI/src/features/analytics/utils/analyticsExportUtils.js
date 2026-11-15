@@ -14,10 +14,19 @@ function downloadFile(content, filename, mimeType = 'text/csv;charset=utf-8;') {
   URL.revokeObjectURL(url);
 }
 
-function sanitizeCSV(val) {
+export function sanitizeCSV(val) {
   if (val === null || val === undefined) return '""';
-  const stringVal = String(val).replace(/"/g, '""');
+  const first = typeof val === 'string' ? [...val].find(ch => ch.charCodeAt(0) > 32 && ch.trim()) : undefined;
+  const safe = first && '=+@-'.includes(first) ? `'${val}` : val;
+  const stringVal = String(safe).replace(/"/g, '""');
   return `"${stringVal}"`;
+}
+
+export function sanitizeExcelText(value) {
+  const text = String(value ?? '');
+  const first = [...text].find(character => character.charCodeAt(0) > 32 && character.trim());
+  const safe = first && '=+@-'.includes(first) ? `'${text}` : text;
+  return safe.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
 /**
@@ -43,7 +52,7 @@ export function exportFullAnalyticsCSV(data) {
   rows.push(['=== 1. EXECUTIVE KPI OVERVIEW ===']);
   rows.push(['Metric', 'Value', 'Notes']);
   rows.push(['Total Revenue', `Rs. ${Number(data.overview?.totalRevenue || 0).toLocaleString()}`, 'Gross sales']);
-  rows.push(['Total Product Cost (COGS)', `Rs. ${Number(data.overview?.totalCost || 0).toLocaleString()}`, 'Purchase-time inventory cost']);
+  rows.push(['Total Product Cost (COGS)', `Rs. ${Number(data.overview?.totalCost || 0).toLocaleString()}`, data.overview?.costsEstimated ? 'Includes estimated costs where purchase-time costs are missing' : 'Purchase-time inventory cost']);
   rows.push(['Gross Profit', `Rs. ${Number(data.overview?.grossProfit || 0).toLocaleString()}`, `${data.overview?.profitMargin || 0}% Gross Margin`]);
   rows.push(['Net Profit', `Rs. ${Number(data.overview?.netProfit || 0).toLocaleString()}`, 'Realized net profit after discounts']);
   rows.push(['Units Sold', data.overview?.totalUnitsSold || 0, 'Total physical units']);
@@ -242,7 +251,8 @@ export function exportExcelReport(data) {
     <head><meta charset="utf-8" /></head>
     <body>
       <h2>iCrowd Advanced Sales Analytics & Business Intelligence Report</h2>
-      <p>Report Date: ${new Date().toLocaleString()} | Period: ${data.overview?.dateRangeLabel || 'All Time'}</p>
+      <p>Report Date: ${new Date().toLocaleString()} | Period: ${sanitizeExcelText(data.overview?.dateRangeLabel || 'All Time')}</p>
+      <p>${data.overview?.costsEstimated ? 'Includes estimated costs where purchase-time costs are missing.' : 'Uses purchase-time costs.'}</p>
       
       <h3>Executive Financial Overview</h3>
       <table border="1" cellpadding="5" cellspacing="0">
@@ -261,8 +271,8 @@ export function exportExcelReport(data) {
           <td>${Number(data.overview?.totalCost || 0).toFixed(2)}</td>
           <td>${Number(data.overview?.grossProfit || 0).toFixed(2)}</td>
           <td>${Number(data.overview?.netProfit || 0).toFixed(2)}</td>
-          <td>${data.overview?.profitMargin || 0}%</td>
-          <td>${data.overview?.totalUnitsSold || 0}</td>
+          <td>${Number(data.overview?.profitMargin || 0)}%</td>
+          <td>${Number(data.overview?.totalUnitsSold || 0)}</td>
           <td>${Number(data.overview?.inventoryValuation || 0).toFixed(2)}</td>
           <td>${Number(data.totalRestockBudget || 0).toFixed(2)}</td>
         </tr>
@@ -275,12 +285,12 @@ export function exportExcelReport(data) {
         </tr>
         ${(data.categoryPerformance || []).map(c => `
           <tr>
-            <td>${c.category}</td>
-            <td>${c.unitsSold}</td>
+            <td style="mso-number-format:'@'">${sanitizeExcelText(c.category)}</td>
+            <td>${Number(c.unitsSold || 0)}</td>
             <td>${Number(c.revenue || 0).toFixed(2)}</td>
             <td>${Number(c.costOfGoods || 0).toFixed(2)}</td>
             <td>${Number(c.grossProfit || 0).toFixed(2)}</td>
-            <td>${c.grossMargin}%</td>
+            <td>${Number(c.grossMargin || 0)}%</td>
           </tr>
         `).join('')}
       </table>
@@ -292,7 +302,7 @@ export function exportExcelReport(data) {
         </tr>
         ${(data.topProducts || []).map(p => `
           <tr>
-            <td>${p.name}</td><td>${p.category}</td><td>${p.unitsSold}</td><td>${Number(p.revenue || 0).toFixed(2)}</td><td>${Number(p.profit || 0).toFixed(2)}</td>
+            <td style="mso-number-format:'@'">${sanitizeExcelText(p.name)}</td><td style="mso-number-format:'@'">${sanitizeExcelText(p.category)}</td><td>${Number(p.unitsSold || 0)}</td><td>${Number(p.revenue || 0).toFixed(2)}</td><td>${Number(p.profit || 0).toFixed(2)}</td>
           </tr>
         `).join('')}
       </table>

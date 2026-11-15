@@ -11,10 +11,10 @@ import java.time.LocalDate;
 
 /**
  * Seeds demonstration accounts for development and test environments.
- * Restricted to non-production profiles (@Profile("!prod")).
+ * Restricted to non-production profiles (@Profile("demo")).
  */
 @Component
-@Profile("!prod")
+@Profile("demo")
 @org.springframework.core.annotation.Order(1)
 public class AdminDataInitializer implements CommandLineRunner {
 
@@ -27,17 +27,19 @@ public class AdminDataInitializer implements CommandLineRunner {
     @Value("${app.default-admin.email:admin@icrowd.com}")
     private String defaultAdminEmail;
 
-    @Value("${app.default-admin.password:Admin@1234}")
+    @Value("${app.default-admin.password:}")
     private String defaultAdminPassword;
 
     @Value("${app.default-customer.email:customer@icrowd.com}")
     private String defaultCustomerEmail;
 
-    @Value("${app.default-customer.password:Customer@1234}")
+    @Value("${app.default-customer.password:}")
     private String defaultCustomerPassword;
 
     @Override
     public void run(String... args) throws Exception {
+        if (defaultAdminPassword == null || defaultAdminPassword.length() < 12 || defaultCustomerPassword == null || defaultCustomerPassword.length() < 12)
+            throw new IllegalStateException("Demo accounts require explicit passwords of at least 12 characters.");
         // 1. Create default admin account if none exists
         if (!userRepository.existsByRole("ADMIN")) {
             Admin adminProfile = Admin.builder()

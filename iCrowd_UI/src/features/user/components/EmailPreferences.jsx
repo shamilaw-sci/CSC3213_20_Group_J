@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../../../lib/axios';
 
+const editablePreferences = data => ({ ...data, subscribed: Boolean(data.subscribed || data.pendingConfirmation) });
+
 export default function EmailPreferences() {
   const [form, setForm] = useState(null);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     let active = true;
-    apiClient.get('/marketing/preferences').then(({ data }) => { if (active) setForm(data); })
+    apiClient.get('/marketing/preferences').then(({ data }) => { if (active) setForm(editablePreferences(data)); })
       .catch(() => { if (active) setMessage('Unable to load email preferences. Please reload the page.'); });
     return () => { active = false; };
   }, []);
   async function save(event) {
     event.preventDefault(); setSaving(true); setMessage('');
-    try { const { data } = await apiClient.put('/marketing/preferences', form); setForm(data); setMessage('Email preferences saved.'); }
+    try { const { data } = await apiClient.put('/marketing/preferences', form); setForm(editablePreferences(data)); setMessage(data.pendingConfirmation ? 'Check your inbox and confirm your subscription. Offers will start only after confirmation.' : 'Email preferences saved.'); }
     catch { setMessage('Unable to save preferences. Please try again.'); }
     finally { setSaving(false); }
   }

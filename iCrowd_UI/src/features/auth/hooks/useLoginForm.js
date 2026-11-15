@@ -31,12 +31,12 @@ export const useLoginForm = () => {
 
         try {
             const user = await login(credentials);
-            if (user?.role === 'ADMIN') {
+            if (['ADMIN', 'INVENTORY_MANAGER'].includes(user?.role)) {
                 navigate('/admin');
             } else {
                 navigate('/');
             }
-        } catch (err) {
+        } catch {
             // Error handled by AuthContext and exposed via authError
         }
     };

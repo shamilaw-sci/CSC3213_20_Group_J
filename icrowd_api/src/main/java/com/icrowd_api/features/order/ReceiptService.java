@@ -28,6 +28,9 @@ public class ReceiptService {
     }
     @Transactional
     public String save(Long id, MultipartFile upload, Authentication actor) throws IOException {
+        // Serialize each owner's quota across their different orders.
+        Order initial=orders.findById(id).orElseThrow(); authorize(initial,actor);
+        users.findForCheckout(initial.getUser().getEmail()).orElseThrow();
         Order order=orders.findForUpdate(id).orElseThrow(); authorize(order,actor);
         if (upload.isEmpty() || upload.getSize()>5*1024*1024) throw new IllegalArgumentException("Choose a receipt smaller than 5 MB.");
         if (order.getReceiptFileName()==null && orders.countByUserIdAndReceiptFileNameIsNotNull(order.getUser().getId())>=20)

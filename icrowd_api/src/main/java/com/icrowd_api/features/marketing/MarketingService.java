@@ -24,27 +24,34 @@ public class MarketingService {
     private final PromoCodeService promoService;
     private final AudienceMatcher matcher;
     private final MarketingProperties config;
+    private final SubscriptionConfirmation confirmation;
 
-    public record PreferenceView(boolean subscribed, String interests, String brands) {}
+    public record PreferenceView(boolean subscribed, String interests, String brands, boolean pendingConfirmation) {
+        public PreferenceView(boolean subscribed, String interests, String brands) { this(subscribed,interests,brands,false); }
+    }
+    private PreferenceView view(EmailPreference p) {
+        return new PreferenceView(p.isSubscribed() && p.getConfirmedAt()!=null,p.getInterests(),p.getBrands(),p.getConfirmationTokenHash()!=null);
+    }
     public record Candidate(Long userId, String email, Long productId, String productName, int score, String reason) {}
     private User user(String email) { return users.findByEmail(email).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)); }
     @Transactional(readOnly=true)
     public PreferenceView preference(String email) {
-        return preferences.findById(user(email).getId()).map(p -> new PreferenceView(p.isSubscribed(), p.getInterests(), p.getBrands()))
+        return preferences.findById(user(email).getId()).map(p -> view(p))
                 .orElse(new PreferenceView(false, "", ""));
     }
     @Transactional
     public PreferenceView savePreference(String email, PreferenceView input) {
-        User u = user(email);
+        User u = users.findForCheckout(email).orElseThrow();
         if (!"CUSTOMER".equals(u.getRole())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         EmailPreference p = preferences.findById(u.getId()).orElseGet(() -> {
             EmailPreference created = new EmailPreference(); created.setUserId(u.getId());
             created.setUnsubscribeToken(UUID.randomUUID().toString() + UUID.randomUUID()); return created;
         });
-        if (input.subscribed() && !p.isSubscribed()) p.setConsentAt(Instant.now());
-        p.setSubscribed(input.subscribed()); p.setInterests(clean(input.interests())); p.setBrands(clean(input.brands()));
+        if (input.subscribed() && (!p.isSubscribed() || p.getConfirmedAt()==null)) confirmation.request(u,p);
+        if (!input.subscribed()) { p.setSubscribed(false); p.setConfirmationTokenHash(null); p.setConfirmationExpiresAt(null); }
+        p.setInterests(clean(input.interests())); p.setBrands(clean(input.brands()));
         p.setUpdatedAt(Instant.now()); preferences.save(p);
-        return new PreferenceView(p.isSubscribed(), p.getInterests(), p.getBrands());
+        return view(p);
     }
     private String clean(String value) {
         if (value == null) return "";
@@ -53,10 +60,10 @@ public class MarketingService {
     }
     @Transactional
     public void unsubscribe(String token) {
-        preferences.findByUnsubscribeToken(token).ifPresent(p -> { p.setSubscribed(false); p.setUpdatedAt(Instant.now()); });
+        preferences.findByUnsubscribeToken(token).ifPresent(p -> { p.setSubscribed(false); p.setConfirmationTokenHash(null); p.setConfirmationExpiresAt(null); p.setUpdatedAt(Instant.now()); });
     }
     public boolean activeCustomer(User user, EmailPreference preference) {
-        return user != null && preference != null && preference.isSubscribed() && "CUSTOMER".equals(user.getRole()) && "ACTIVE".equals(user.getAccountStatus());
+        return user != null && preference != null && preference.isSubscribed() && preference.getConfirmedAt()!=null && "CUSTOMER".equals(user.getRole()) && "ACTIVE".equals(user.getAccountStatus());
     }
     public boolean validPromo(EmailCampaign campaign, User user) {
         return !"PROMO".equals(campaign.getKind()) || promoService.getAvailablePromotions(user.getEmail()).stream().anyMatch(p -> p.getId().equals(campaign.getSourceId()));
@@ -80,14 +87,20 @@ public class MarketingService {
     }
     @Transactional(readOnly=true)
     public List<Candidate> audience(Long campaignId) {
-        EmailCampaign campaign = campaigns.findById(campaignId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return audience(campaigns.findById(campaignId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)), preferences.findTop50BySubscribedTrueAndUserIdGreaterThanOrderByUserIdAsc(0L));
+    }
+    public AudienceMatcher.Affinity affinity(Long id) {
+        return matcher.fromRows(orders.purchaseAffinity(id,com.icrowd_api.features.analytics.AnalyticsService.QUALIFYING_ORDER_STATUSES,com.icrowd_api.features.analytics.AnalyticsService.QUALIFYING_PAYMENT_STATUSES));
+    }
+    private List<Candidate> audience(EmailCampaign campaign,List<EmailPreference> batch) {
         if (expired(campaign) || !ready(campaign)) return List.of();
-        List<Product> pool = "PRODUCT".equals(campaign.getKind()) ? products.findAllById(List.of(campaign.getSourceId())) : products.findAllActiveProductsList();
+        List<Product> pool = "PRODUCT".equals(campaign.getKind()) ? products.findAllById(List.of(campaign.getSourceId())) : products.findCatalogCandidates("",org.springframework.data.domain.PageRequest.of(0,500));
         List<Candidate> result = new ArrayList<>();
-        for (EmailPreference p : preferences.findBySubscribedTrue()) {
-            User u = users.findById(p.getUserId()).orElse(null);
+        Map<Long,User> batchUsers=new HashMap<>(); users.findAllById(batch.stream().map(EmailPreference::getUserId).toList()).forEach(u -> batchUsers.put(u.getId(),u));
+        for (EmailPreference p : batch) {
+            User u = batchUsers.get(p.getUserId());
             if (!activeCustomer(u, p) || p.getConsentAt() == null || p.getConsentAt().isAfter(campaign.getCreatedAt()) || !validPromo(campaign, u)) continue;
-            List<Order> history = orders.findByUserId(u.getId());
+            AudienceMatcher.Affinity history = affinity(u.getId());
             Candidate best = null;
             for (Product product : pool) {
                 AudienceMatcher.Match match = matcher.match(product, p, history);
@@ -99,23 +112,30 @@ public class MarketingService {
     }
     @Transactional
     public void prepare() {
-        for (EmailCampaign campaign : campaigns.findByPreparedFalseOrderByIdAsc()) {
+        if (!config.isEnabled()) return;
+        for (EmailCampaign campaign : campaigns.findTop10ByPreparedFalseOrderByIdAsc()) {
             if (expired(campaign)) { campaign.setPrepared(true); continue; }
             if (!ready(campaign)) continue;
-            for (Candidate candidate : audience(campaign.getId())) {
+            List<EmailPreference> batch=preferences.findTop50BySubscribedTrueAndUserIdGreaterThanOrderByUserIdAsc(campaign.getAfterUserId()==null ? 0L : campaign.getAfterUserId());
+            for (Candidate candidate : audience(campaign,batch)) {
                 EmailDelivery d = new EmailDelivery(); d.setCampaignId(campaign.getId()); d.setUserId(candidate.userId());
                 d.setProductId(candidate.productId()); d.setScore(candidate.score()); d.setReason(candidate.reason()); deliveries.save(d);
             }
-            campaign.setPrepared(true);
+            if (!batch.isEmpty()) campaign.setAfterUserId(batch.getLast().getUserId());
+            campaign.setPrepared(batch.size()<50);
+            break; // At most fifty recipients are prepared in one transaction.
         }
     }
     @Transactional(readOnly=true)
     public Map<String,Object> dashboard() {
         List<Map<String,Object>> rows = new ArrayList<>();
-        for (EmailCampaign c : campaigns.findTop30ByOrderByIdDesc()) {
+        List<EmailCampaign> recent=campaigns.findTop30ByOrderByIdDesc();
+        Map<Long,Map<String,Long>> counts=new HashMap<>();
+        if (!recent.isEmpty()) for (var count : deliveries.countCampaignStatuses(recent.stream().map(EmailCampaign::getId).toList())) counts.computeIfAbsent((Long)count[0],k -> new HashMap<>()).put((String)count[1],((Number)count[2]).longValue());
+        for (EmailCampaign c : recent) {
             Map<String,Object> row = new LinkedHashMap<>(); row.put("id",c.getId()); row.put("kind",c.getKind()); row.put("createdAt",c.getCreatedAt());
             row.put("sourceId",c.getSourceId()); row.put("prepared",c.isPrepared());
-            for (String status : List.of("QUEUED","SENDING","SENT","RETRY","FAILED","SKIPPED")) row.put(status.toLowerCase(Locale.ROOT),deliveries.countByCampaignIdAndStatus(c.getId(),status));
+            for (String status : List.of("QUEUED","SENDING","SENT","RETRY","FAILED","SKIPPED")) row.put(status.toLowerCase(Locale.ROOT),counts.getOrDefault(c.getId(),Map.of()).getOrDefault(status,0L));
             rows.add(row);
         }
         return Map.of("enabled",config.isEnabled(),"dailyLimit",config.getDailyLimit(),"weeklyCustomerLimit",config.getWeeklyCustomerLimit(),"campaigns",rows);

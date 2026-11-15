@@ -25,7 +25,8 @@ public class SubscriptionConfirmation {
     public void request(User user, EmailPreference preference) {
         Instant now=Instant.now();
         if (preference.getConfirmationRequestedAt()!=null && preference.getConfirmationRequestedAt().isAfter(now.minusSeconds(3600)))
-            return;
+            { if (preference.getConfirmationTokenHash()!=null) return;
+              throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,"Please wait one hour before requesting another confirmation email."); }
         var uri=java.net.URI.create(config.getPublicApiUrl());
         if (config.getFrom().isBlank() || mail.getIfAvailable()==null || !"https".equals(uri.getScheme()) || uri.getHost()==null)
             throw new IllegalStateException("Email confirmation is unavailable. Your subscription has not been enabled.");

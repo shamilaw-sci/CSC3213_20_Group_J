@@ -129,7 +129,7 @@ class RecommendationServiceTest {
     @DisplayName("1. Multi-Attribute Content-Based Similarity should rank Galaxy S24 as top similar for iPhone 16")
     void testSimilarProductsContentBased() {
         when(productRepository.findByIdAndIsActiveTrue(101L)).thenReturn(Optional.of(iphone16));
-        when(productRepository.findAllActiveProductsList()).thenReturn(List.of(iphone16, galaxyS24, spigenCase, airpods));
+        when(productRepository.findCatalogCandidates(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(iphone16, galaxyS24, spigenCase, airpods));
 
         List<Product> similar = recommendationService.getSimilarProducts(101L, 3);
 
@@ -156,9 +156,9 @@ class RecommendationServiceTest {
         assertEquals(1, response.getBundledProducts().size());
         assertEquals(spigenCase.getId(), response.getBundledProducts().get(0).getId());
         assertTrue(response.getIsEmpiricalBasket());
-        // Check bundle savings discount is applied
-        assertTrue(response.getBundleTotal().compareTo(response.getRegularTotal()) < 0);
-        assertTrue(response.getSavings().compareTo(BigDecimal.ZERO) > 0);
+        // Bundle price must agree with checkout: no unimplemented discount.
+        assertEquals(0,response.getBundleTotal().compareTo(response.getRegularTotal()));
+        assertEquals(0,response.getSavings().compareTo(BigDecimal.ZERO));
     }
 
     @Test
@@ -167,7 +167,7 @@ class RecommendationServiceTest {
         when(productRepository.findByIdAndIsActiveTrue(101L)).thenReturn(Optional.of(iphone16));
         when(orderItemRepository.findFrequentlyBoughtTogetherProductIds(eq(101L), any(), any(Pageable.class)))
                 .thenReturn(List.of()); // No prior shared orders
-        when(productRepository.findAllActiveProductsList()).thenReturn(List.of(iphone16, spigenCase, airpods));
+        when(productRepository.findCatalogCandidates(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(iphone16, spigenCase, airpods));
 
         FrequentlyBoughtTogetherResponse response = recommendationService.getFrequentlyBoughtTogether(101L, 2);
 
@@ -200,7 +200,7 @@ class RecommendationServiceTest {
         when(orderRepository.findAllQualifyingOrders(any())).thenReturn(List.of(recentOrder, oldOrder));
         when(productRepository.findByIdAndIsActiveTrue(101L)).thenReturn(Optional.of(iphone16));
         when(productRepository.findByIdAndIsActiveTrue(102L)).thenReturn(Optional.of(galaxyS24));
-        when(productRepository.findAllActiveProductsList()).thenReturn(List.of(iphone16, galaxyS24));
+        when(productRepository.findCatalogCandidates(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(iphone16, galaxyS24));
 
         List<Product> trending = recommendationService.getTrendingProducts(30, 2);
 
@@ -231,7 +231,7 @@ class RecommendationServiceTest {
     @Test
     @DisplayName("6. Budget-Aware Recommendations should strictly filter within maximum price limit")
     void testBudgetAwareRecommendations() {
-        when(productRepository.findAllActiveProductsList()).thenReturn(List.of(iphone16, galaxyS24, spigenCase, airpods));
+        when(productRepository.findCatalogCandidates(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(iphone16, galaxyS24, spigenCase, airpods));
 
         // Filter budget under 50,000 LKR
         List<Product> affordable = recommendationService.getBudgetAwareRecommendations(

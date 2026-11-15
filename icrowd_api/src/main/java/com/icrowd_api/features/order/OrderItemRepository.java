@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
-    @Query("SELECT oi.product.id FROM OrderItem oi JOIN oi.order o WHERE o.createdAt >= :startDate AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED') GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
+    @Query("SELECT oi.product.id FROM OrderItem oi JOIN oi.order o WHERE o.createdAt >= :startDate AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED') AND o.paymentStatus IN ('SUCCESS','PAID','DUE_ON_DELIVERY') AND oi.product.isActive=true GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
     List<Long> findTopSellingProductIds(@Param("startDate") LocalDateTime startDate, Pageable pageable);
 
     @Query("SELECT oi2.product.id, COUNT(oi2.product.id) " +

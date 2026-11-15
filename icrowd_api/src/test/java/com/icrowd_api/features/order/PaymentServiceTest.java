@@ -45,7 +45,7 @@ class PaymentServiceTest {
    when(bank.checkout(any(),any(),any())).thenReturn(Map.of("hash","test"));
    when(bank.refundsConfigured()).thenReturn(true);
    service.initiatePayment(email,InitiatePaymentRequest.builder().orderId(orderId).paymentMethod(PaymentMethod.CARD).build());
-   return payments.findByOrderId(orderId).getFirst();
+   return payments.findByOrderId(orderId).stream().max(Comparator.comparing(Payment::getId)).orElseThrow();
  }
  Map<String,String> result(Payment p,String status) {
    return Map.of("merchant_id","merchant","order_id",p.getInternalPaymentId(),"payment_id","pay_"+p.getId(),
@@ -53,6 +53,43 @@ class PaymentServiceTest {
  }
  void success(Payment p) { service.processNotification(result(p,"succeeded")); }
  @Autowired com.icrowd_api.features.promo.PromoCodeRepository promos;
+ @Autowired com.icrowd_api.features.promo.PromoCodeService promoService;
+ @Test void invalidPercentagesCannotCreateNegativeOrders() {
+   var req = new com.icrowd_api.features.promo.PromoCodeRequest();
+   req.setCode("TOOMUCH"); req.setDiscountType(com.icrowd_api.features.promo.DiscountType.PERCENTAGE);
+   req.setDiscountValue(new BigDecimal("150"));
+   assertThrows(com.icrowd_api.features.promo.PromoCodeInvalidException.class, () -> promoService.createPromoCode(req));
+ }
+ @Test void pendingPromoReservationsSerializeConcurrentOrders() throws Exception {
+   String code="LIMIT"+UUID.randomUUID().toString().replace("-","");
+   promos.save(com.icrowd_api.features.promo.PromoCode.builder().code(code).discountType(com.icrowd_api.features.promo.DiscountType.FIXED)
+      .discountValue(BigDecimal.TEN).totalUsageLimit(1).build());
+   var ready=new CountDownLatch(2);var go=new CountDownLatch(1);
+   try(var executor=Executors.newFixedThreadPool(2)) {
+     Callable<Boolean> checkout=() -> { var r=request(PaymentMethod.CARD);r.setPromoCode(code);ready.countDown();go.await();
+       try {orders.createNewOrder(email,r);return true;} catch(IllegalArgumentException rejected) {return false;} };
+     var a=executor.submit(checkout);var b=executor.submit(checkout);assertTrue(ready.await(5,TimeUnit.SECONDS));go.countDown();
+     assertNotEquals(a.get(15,TimeUnit.SECONDS),b.get(15,TimeUnit.SECONDS));
+   }
+   assertEquals(1,promos.findByCodeIgnoreCase(code).orElseThrow().getUsageCount());
+ }
+ @Test void chargebackCannotBeResurrectedByAnOldSuccessNotification() {
+   Long id=orders.createNewOrder(email,request(PaymentMethod.CARD)).getOrderId();Payment p=start(id);success(p);
+   var chargeback=new HashMap<>(result(p,"succeeded"));chargeback.put("status_code","-3");service.processNotification(chargeback);success(p);
+   assertEquals(PaymentStatus.CHARGEBACK,payments.findById(p.getId()).orElseThrow().getStatus());
+   assertEquals(OrderStatus.CHARGEBACK,orderRepository.findById(id).orElseThrow().getStatus());
+   assertEquals(0,products.findById(product.getId()).orElseThrow().getAvailableStock());
+ }
+ @Test void unverifiedPaymentsBlockNewChargesAndCodUntilMerchantResolution() {
+   Long id=orders.createNewOrder(email,request(PaymentMethod.CARD)).getOrderId();Payment p=start(id);
+   when(bank.refundsConfigured()).thenReturn(false);service.reconcilePayment(p.getId());
+   assertEquals(PaymentStatus.REVIEW_REQUIRED,payments.findById(p.getId()).orElseThrow().getStatus());
+   assertThrows(IllegalStateException.class,() -> start(id));
+   assertThrows(IllegalArgumentException.class,() -> orders.switchToCod(email,id));
+   service.resolveReview(p.getId(),"FAILED","Merchant dashboard confirms no captured payment, reference TEST-123");
+   assertEquals(OrderStatus.FAILED,orderRepository.findById(id).orElseThrow().getStatus());
+   assertEquals(PaymentStatus.INITIATED,start(id).getStatus());
+ }
  @Test void mergedPromoDiscountReachesOrderAndPayment() {
    String code="PROMO"+UUID.randomUUID().toString().replace("-","");
    promos.save(com.icrowd_api.features.promo.PromoCode.builder().code(code)
@@ -101,7 +138,7 @@ class PaymentServiceTest {
    Long id=orders.createNewOrder(email,request(PaymentMethod.CARD)).getOrderId();
    Payment payment=start(id);
    service.processNotification(result(payment,"failed"));
-   assertThrows(IllegalArgumentException.class,()->orders.switchToCod("other@test.com",id));
+   assertThrows(org.springframework.web.server.ResponseStatusException.class,()->orders.switchToCod("other@test.com",id));
    orders.createNewOrder(email,request(PaymentMethod.COD));
    assertThrows(OutOfStockException.class,()->orders.switchToCod(email,id));
    assertEquals(PaymentMethod.CARD,orderRepository.findById(id).orElseThrow().getPaymentMethod());

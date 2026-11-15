@@ -8,7 +8,8 @@ const OverviewCards = ({ overview = {} }) => {
     totalRevenue = 0,
     totalCost = 0,
     grossProfit = 0,
-    totalProfit = 0,
+    netProfit = 0,
+    costsEstimated = false,
     profitMargin = 0,
     totalUnitsSold = 0,
     qualifyingOrderCount = 0,
@@ -32,11 +33,11 @@ const OverviewCards = ({ overview = {} }) => {
       borderColor: 'border-blue-500/30',
     },
     {
-      title: 'Gross / Net Profit',
-      value: `Rs ${Number(totalProfit || grossProfit || 0).toLocaleString()}`,
-      subtext: `Cost of goods: Rs ${Number(totalCost || 0).toLocaleString()} (Purchase-time cost)`,
+      title: costsEstimated ? 'Estimated Net Profit' : 'Net Profit',
+      value: `Rs ${Number(netProfit).toLocaleString()}`,
+      subtext: `Gross profit: Rs ${Number(grossProfit).toLocaleString()} · Cost of goods: Rs ${Number(totalCost).toLocaleString()} (${costsEstimated ? 'includes estimated costs' : 'purchase-time cost'})`,
       icon: '📈',
-      badge: `${profitMargin}% Margin`,
+      badge: `${profitMargin}% Gross Margin`,
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       gradient: 'from-emerald-600/20 to-teal-600/5',
       borderColor: 'border-emerald-500/30',
@@ -84,7 +85,7 @@ const OverviewCards = ({ overview = {} }) => {
           <p className="text-2xl font-bold tracking-tight text-white mb-1">
             {card.value}
           </p>
-          <p className="text-xs text-slate-400 font-medium truncate">
+          <p className="text-xs text-slate-400 font-medium">
             {card.subtext}
           </p>
         </div>

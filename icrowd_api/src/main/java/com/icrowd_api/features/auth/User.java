@@ -20,6 +20,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class User {
+    @PrePersist @PreUpdate
+    void normalizeEmail() { email = EmailAddress.canonical(email); }
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

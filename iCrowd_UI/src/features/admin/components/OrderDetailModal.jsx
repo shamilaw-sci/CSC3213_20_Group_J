@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { downloadOrderReceipt } from '../api/adminOrderApi';
 
 const formatCurrency = (val) =>
     val != null ? `LKR ${parseFloat(val).toLocaleString('en-LK', { minimumFractionDigits: 2 })}` : '—';
@@ -53,6 +54,15 @@ const getPaymentBadge = (status) => {
 };
 
 const OrderDetailModal = ({ isOpen, order, onClose, onOpenFulfillment }) => {
+    const [receiptError, setReceiptError] = useState('');
+    const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+    const handleReceipt = async () => {
+        setReceiptError('');
+        setDownloadingReceipt(true);
+        try { await downloadOrderReceipt(order.id); }
+        catch { setReceiptError('The receipt could not be downloaded. Please try again.'); }
+        finally { setDownloadingReceipt(false); }
+    };
     if (!isOpen || !order) return null;
 
     const hasMapCoords = order.shippingLat != null && order.shippingLng != null;
@@ -151,14 +161,15 @@ const OrderDetailModal = ({ isOpen, order, onClose, onOpenFulfillment }) => {
                         </div>
                         {order.receiptUrl && (
                             <div>
-                                <a
-                                    href={order.receiptUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
+                                <button
+                                    type="button"
+                                    onClick={handleReceipt}
+                                    disabled={downloadingReceipt}
                                     className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
                                 >
-                                    View Uploaded Receipt
-                                </a>
+                                    {downloadingReceipt ? 'Downloading…' : 'Download Uploaded Receipt'}
+                                </button>
+                                {receiptError && <p role="alert" className="text-xs text-red-600">{receiptError}</p>}
                             </div>
                         )}
                     </div>

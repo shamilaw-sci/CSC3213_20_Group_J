@@ -2,12 +2,6 @@ import React, { useState } from 'react';
 
 const STATUS_OPTIONS = [
     {
-        value: 'PENDING_PAYMENT',
-        label: 'Awaiting Payment',
-        desc: 'Customer has not yet completed payment.',
-        badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-    },
-    {
         value: 'CONFIRMED',
         label: 'Confirmed',
         desc: 'Order confirmed (COD or payment verified). Ready to prepare.',
@@ -40,7 +34,7 @@ const STATUS_OPTIONS = [
     {
         value: 'CANCELLED',
         label: 'Cancelled',
-        desc: 'Order cancelled. Reserved inventory is restored back to stock.',
+        desc: 'Order cancelled. Only unshipped orders without paid or unresolved payments can be cancelled.',
         badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
     },
 ];
@@ -138,10 +132,11 @@ const OrderFulfillmentModal = ({ isOpen, order, onClose, onUpdateStatus, loading
                     {/* Optional Note */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                            Tracking note / courier reference (Optional)
+                            Tracking note / courier reference (saved to audit history)
                         </label>
                         <input
                             type="text"
+                            maxLength={500}
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
                             placeholder="e.g. Courier tracking #PR12345678"

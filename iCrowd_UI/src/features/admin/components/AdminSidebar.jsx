@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useContext } from 'react';
-import { AuthContext } from '../../auth/context/AuthContext';
+import { AuthContext } from '../../auth/context/authState';
 
 const navItems = [
+    { to: '/admin/payments', label: 'Payment reviews', icon: <span aria-hidden="true">¤</span> },
     { to: '/admin/storefront', label: 'Homepage banner', icon: <span aria-hidden="true">▧</span> },
     {
         to: '/admin',
@@ -97,7 +98,7 @@ const AdminSidebar = () => {
 
             {/* Navigation */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">
-                {navItems.map(item => (
+                {navItems.filter(item => user?.role === 'ADMIN' || ['/admin', '/admin/products', '/admin/categories'].includes(item.to)).map(item => (
                     <NavLink
                         key={item.to}
                         to={item.to}

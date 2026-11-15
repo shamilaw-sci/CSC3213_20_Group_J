@@ -16,7 +16,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/orders")
-@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminOrderController {
 
@@ -34,7 +33,7 @@ public class AdminOrderController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) OrderStatus status) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageRequest pageRequest = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(100, size)), Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<AdminOrderSummaryDto> orders = orderService.getOrdersForAdmin(pageRequest, search, status);
         return ResponseEntity.ok(orders);
     }
@@ -44,12 +43,7 @@ public class AdminOrderController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<?> getOrderById(@PathVariable Long id) {
-        try {
-            AdminOrderSummaryDto dto = orderService.getOrderDetailsForAdmin(id);
-            return ResponseEntity.ok(dto);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(orderService.getOrderDetailsForAdmin(id));
     }
 
     /**
@@ -60,15 +54,7 @@ public class AdminOrderController {
             @PathVariable Long id,
             @Valid @RequestBody AdminOrderStatusUpdateRequest request,
             Authentication authentication) {
-        try {
-            String adminEmail = authentication != null ? authentication.getName() : "ADMIN";
-            AdminOrderSummaryDto updated = orderService.updateOrderStatusByAdmin(id, request.getStatus(), adminEmail);
-            return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+        return ResponseEntity.ok(orderService.updateOrderStatusByAdmin(id, request.getStatus(), authentication.getName(), request.getNote()));
     }
 
     /**

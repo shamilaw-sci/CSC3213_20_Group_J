@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, ShoppingCart, Check, Sparkles } from 'lucide-react';
 import { fetchFrequentlyBoughtTogether } from '../api/recommendationApi';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { Link } from 'react-router-dom';
 
 const FrequentlyBoughtTogether = ({ productId }) => {
@@ -13,7 +13,6 @@ const FrequentlyBoughtTogether = ({ productId }) => {
   useEffect(() => {
     if (!productId) return;
     let isMounted = true;
-    setLoading(true);
 
     fetchFrequentlyBoughtTogether(productId, 2)
       .then((res) => {
@@ -59,9 +58,9 @@ const FrequentlyBoughtTogether = ({ productId }) => {
               <Sparkles className="w-3.5 h-3.5" />
               {isEmpiricalBasket ? 'AI Frequent Pair' : 'AI Smart Bundle'}
             </span>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            {discountPercentage > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               Save {discountPercentage}%
-            </span>
+            </span>}
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">
             Frequently Bought Together
@@ -93,7 +92,7 @@ const FrequentlyBoughtTogether = ({ productId }) => {
                   />
                 </div>
                 <Link
-                  to={`/products/${p.id}`}
+                  to={`/product/${p.id}`}
                   className="text-xs font-bold text-white text-center line-clamp-2 hover:text-emerald-400 transition-colors"
                   title={p.name}
                 >

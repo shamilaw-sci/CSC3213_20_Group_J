@@ -21,3 +21,21 @@ Thumbs.db
 .env
 .env.local
 icrowd_api/.env
+/local-backups/
+
+# Runtime output and private local diagnostics (never source code)
+*.log
+*.hprof
+*.jfr
+*.dmp
+replay_pid*
+**/untracked_backup/
+
+# Local environment variants; retain safe configuration examples
+.env.*
+!.env.example
+!.env.sample
+
+# Raw one-off audit output; retain reports and reproducible check scripts
+/docs/audit-2026-11-15/*.txt
+/docs/audit-2026-11-15/*.json

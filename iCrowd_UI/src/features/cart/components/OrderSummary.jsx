@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import PromoPicker from './PromoPicker';
-import { useCart } from '../hooks/CartContext';
+import { useCart } from '../hooks/cartState';
 import { formatLkr } from '../../../lib/currency';
 
 const OrderSummary = ({ total, itemCount, onCheckout, disabled = false }) => {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../../auth/context/authState';
 import { Link } from 'react-router-dom';
 import { getDashboardData } from '../api/adminUserApi';
 import DashboardCard from '../components/DashboardCard';
@@ -65,6 +66,8 @@ const getStatusBadge = (status) => {
 };
 
 const AdminDashboard = () => {
+    const { user } = useContext(AuthContext);
+    const isAdmin = user?.role === 'ADMIN';
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -207,7 +210,7 @@ const AdminDashboard = () => {
                     <p className="text-sm text-gray-400 mt-1">Real-time overview of store performance, orders and catalog.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link
+                    {isAdmin && <Link
                         to="/admin/orders"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all shadow-sm"
                     >
@@ -215,7 +218,7 @@ const AdminDashboard = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
                         View Orders
-                    </Link>
+                    </Link>}
                     <Link
                         to="/admin/products"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-gray-950 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-all active:scale-95 shadow-sm"
@@ -230,7 +233,7 @@ const AdminDashboard = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {stats.map(s => (
+                {stats.filter(s => isAdmin || ['Total Products', 'Out of Stock', 'Total Users'].includes(s.label)).map(s => (
                     <DashboardCard key={s.label} {...s} />
                 ))}
             </div>
@@ -242,7 +245,7 @@ const AdminDashboard = () => {
                     { label: 'Manage Products', to: '/admin/products', desc: 'Add, edit, deactivate' },
                     { label: 'Manage Categories', to: '/admin/categories', desc: 'Organise product groups' },
                     { label: 'Manage Users', to: '/admin/users', desc: 'Promote or remove users' },
-                ].map(action => (
+                ].filter(action => isAdmin || ['/admin/products', '/admin/categories'].includes(action.to)).map(action => (
                     <Link
                         key={action.to}
                         to={action.to}
@@ -257,13 +260,13 @@ const AdminDashboard = () => {
 
             {/* Tables Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <MiniTable
+                {isAdmin && <MiniTable
                     title="Recent Orders"
                     rows={data?.recentOrders || []}
                     columns={recentOrderCols}
                     linkTo="/admin/orders"
                     linkText="Manage All →"
-                />
+                />}
                 <MiniTable
                     title="Recent Products"
                     rows={data?.recentProducts || []}

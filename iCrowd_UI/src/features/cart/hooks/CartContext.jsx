@@ -1,10 +1,9 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useCartPromo } from './useCartPromo';
 import { syncCartWithBackend, fetchCart } from '../api/cartApi';
 
-const CartContext = createContext();
-export const useCart = () => useContext(CartContext);
+import { CartContext } from './cartState';
 
 function readCart(key) {
   try {
@@ -15,25 +14,23 @@ function readCart(key) {
 
 // Remount all cart state on account changes, including pending request guards.
 export const CartProvider = ({ children }) => {
-  const { user, initializing } = useAuth();
-  if (initializing) return <p role="status" className="p-8">Loading your accountÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>;
-  const owner = user ? String(user.id || user.email) : 'guest';
-  return <AccountCartProvider key={owner} owner={owner} authenticated={!!user}>{children}</AccountCartProvider>;
+  const { user, initializing, credential } = useAuth();
+  const owner = initializing ? 'initializing' : user ? String(user.id || user.email) : 'guest';
+  return <AccountCartProvider key={`${owner}:${credential || ""}`} owner={owner} authenticated={!!user} initializing={initializing} token={credential}>{children}</AccountCartProvider>;
 };
 
-function AccountCartProvider({ children, owner, authenticated }) {
+function AccountCartProvider({ children, owner, authenticated, initializing, token }) {
   const storageKey = authenticated ? `iCrowd_cart:${owner}` : 'iCrowd_guest_cart';
   const [cart, setCart] = useState(() => readCart(storageKey));
   const cartRef = useRef(cart);
-  const [cartLoading, setCartLoading] = useState(authenticated);
-  const [cartReady, setCartReady] = useState(!authenticated);
+  const [cartLoading, setCartLoading] = useState(authenticated || initializing);
+  const [cartReady, setCartReady] = useState(!authenticated && !initializing);
   const promotion = useCartPromo(owner, cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0), authenticated && cartReady);
   const [syncError, setSyncError] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const queue = useRef(Promise.resolve());
   const active = useRef(false);
   const revision = useRef(0);
-  const token = useRef(localStorage.getItem('token')).current;
 
   const persist = (items) => {
     cartRef.current = items;
@@ -84,8 +81,8 @@ function AccountCartProvider({ children, owner, authenticated }) {
     const version = ++revision.current;
     setIsSyncing(true);
     queue.current = queue.current.catch(() => {}).then(async () => {
-      if (!active.current || localStorage.getItem('token') !== token) return;
       try {
+        if (!active.current || localStorage.getItem('token') !== token) return;
         await syncCartWithBackend(items, token);
         if (active.current && version === revision.current) {
           setSyncError('');
@@ -132,5 +129,5 @@ function AccountCartProvider({ children, owner, authenticated }) {
     getCartTotal: () => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
     getItemCount: () => cart.reduce((sum, item) => sum + item.quantity, 0),
     isProductInCart: id => cart.some(item => item.product.id === id),
-  }}>{cartLoading ? <p role="status" className="p-8">Loading your cartâ€¦</p> : children}</CartContext.Provider>;
+  }}>{children}</CartContext.Provider>;
 }

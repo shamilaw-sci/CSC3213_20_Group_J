@@ -127,9 +127,11 @@ public class ProductService {
         if (keyword == null || keyword.trim().isEmpty()) {
             return new SuggestionResponse(List.of(), List.of(), List.of());
         }
-        String searchKey = keyword.toLowerCase().trim();
-        List<Product> allProducts = productRepository.findAllActiveProductsList();
-        LevenshteinDistance distance = new LevenshteinDistance();
+        if (keyword.length()>100) throw new IllegalArgumentException("Search must be at most 100 characters.");
+        String searchKey = keyword.toLowerCase(java.util.Locale.ROOT).trim();
+        String prefix=searchKey.substring(0,Math.min(2,searchKey.length())).replace("%", "").replace("_", "");
+        List<Product> allProducts = productRepository.findCatalogCandidates(prefix,PageRequest.of(0,200));
+        LevenshteinDistance distance = new LevenshteinDistance(2);
 
         List<String> terms = allProducts.stream()
                 .map(p -> p != null ? p.getName() : "")
@@ -140,7 +142,8 @@ public class ProductService {
                     if (lowerName.contains(searchKey)) return true;
                     for (String word : lowerName.split("\\s+")) {
                         int allowed = word.length() <= 4 ? 1 : 2;
-                        if (distance.apply(word, searchKey) <= allowed) return true;
+                        int difference=distance.apply(word, searchKey);
+                        if (difference>=0 && difference <= allowed) return true;
                     }
                     return false;
                 })
@@ -162,7 +165,8 @@ public class ProductService {
                     if (lowerCat.contains(searchKey)) return true;
                     for (String word : lowerCat.split("\\s+")) {
                         int allowed = word.length() <= 4 ? 1 : 2;
-                        if (distance.apply(word, searchKey) <= allowed) return true;
+                        int difference=distance.apply(word, searchKey);
+                        if (difference>=0 && difference <= allowed) return true;
                     }
                     return false;
                 })
@@ -174,7 +178,8 @@ public class ProductService {
                     if (lowerName.contains(searchKey)) return true;
                     for (String word : lowerName.split("\\s+")) {
                         int allowed = word.length() <= 4 ? 1 : 2;
-                        if (distance.apply(word, searchKey) <= allowed) return true;
+                        int difference=distance.apply(word, searchKey);
+                        if (difference>=0 && difference <= allowed) return true;
                     }
                     return false;
                 })
@@ -203,6 +208,7 @@ public class ProductService {
 
     @org.springframework.transaction.annotation.Transactional
     public Product createProduct(ProductRequest request, String actorEmail) {
+        validateManagementFields(request);
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + request.categoryId()));
 
@@ -212,6 +218,8 @@ public class ProductService {
                 .description(request.description())
                 .category(category)
                 .price(request.price())
+                .costPrice(request.costPrice())
+                .leadTimeDays(request.leadTimeDays()==null?7:request.leadTimeDays())
                 .availableStock(request.availableStock())
                 .imageUrls(request.imageUrls() != null ? request.imageUrls() : List.of())
                 .tags(request.tags() != null ? request.tags() : List.of())
@@ -236,9 +244,14 @@ public class ProductService {
 
     @org.springframework.transaction.annotation.Transactional
     public Product updateProduct(Long id, ProductRequest request, String actorEmail) {
+        validateManagementFields(request);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
+        if (request.version()==null || request.version()!=product.getVersion())
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"This product changed. Reload before saving.");
+        if (request.costPrice()!=null) product.setCostPrice(request.costPrice());
+        if (request.leadTimeDays()!=null) product.setLeadTimeDays(request.leadTimeDays());
         boolean wasActive = Boolean.TRUE.equals(product.getIsActive());
 
         if (request.categoryId() != null) {
@@ -302,10 +315,11 @@ public class ProductService {
     }
 
     public List<Product> getLowStockProducts(int threshold) {
-        return productRepository.findLowStockProducts(threshold);
+        return productRepository.findLowStockProducts(Math.max(0, threshold), PageRequest.of(0, 50));
     }
 
     public List<Product> getRecentProducts(int limit) {
+        limit = Math.max(1,Math.min(limit,50));
         return productRepository.findRecentProducts(PageRequest.of(0, limit));
     }
 
@@ -379,6 +393,7 @@ public class ProductService {
     }
 
     public List<Product> getFeaturedProducts(int limit) {
+        limit = Math.max(1,Math.min(limit,50));
         List<Product> featured = new ArrayList<>();
 
         if (orderItemRepository != null) {
@@ -417,6 +432,7 @@ public class ProductService {
     }
 
     public List<Product> getLatestProducts(int limit) {
+        limit = Math.max(1,Math.min(limit,50));
         return productRepository.findByIsActiveTrue(
                 PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"))
         ).getContent();
@@ -451,6 +467,7 @@ public class ProductService {
     public List<Product> getCartSuggestions(List<Long> cartProductIds, String userEmail, int limit) {
         if (limit <= 0) return List.of();
         limit = Math.min(limit, 100);
+        if (cartProductIds != null && cartProductIds.size()>100) throw new IllegalArgumentException("Too many cart products.");
         List<Long> safeCartIds = cartProductIds != null ? cartProductIds : List.of();
         List<Product> suggestions = new ArrayList<>();
 
@@ -512,5 +529,10 @@ public class ProductService {
         int reviews = candidate.getReviewCount() == null ? 0 : candidate.getReviewCount();
         double rating = candidate.getAverageRating() == null ? 0 : candidate.getAverageRating();
         return score + (rating * reviews + 15) / (reviews + 5.0);
+    }
+    private void validateManagementFields(ProductRequest r) {
+        if (r==null || (r.costPrice()!=null && (r.costPrice().signum()<0 || r.costPrice().scale()>2))
+                || (r.leadTimeDays()!=null && (r.leadTimeDays()<1 || r.leadTimeDays()>365)))
+            throw new IllegalArgumentException("Cost must be nonnegative with two decimal places; lead time must be 1–365 days.");
     }
 }

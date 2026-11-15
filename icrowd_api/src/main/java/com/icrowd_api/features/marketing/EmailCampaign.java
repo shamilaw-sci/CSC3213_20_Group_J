@@ -10,4 +10,5 @@ public class EmailCampaign {
     private Long sourceId;
     private Instant createdAt;
     private boolean prepared;
+    private Long afterUserId = 0L;
 }

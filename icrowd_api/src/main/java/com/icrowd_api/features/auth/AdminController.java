@@ -19,7 +19,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
@@ -135,15 +134,18 @@ public class AdminController {
 
     // ── Dashboard overview ─────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> getDashboard() {
+    public ResponseEntity<Map<String, Object>> getDashboard(Authentication authentication) {
         java.util.Map<String, Long> productStats = productService.getDashboardStats();
         java.util.Map<String, Object> dashboard = new java.util.HashMap<>(productStats);
         dashboard.put("totalCategories", categoryService.getTotalCount());
-        dashboard.put("totalUsers", userService.getAllUsers().size());
+        dashboard.put("totalUsers", userService.countUsers());
         dashboard.put("recentProducts", productService.getRecentProducts(5));
         dashboard.put("lowStockProducts", productService.getLowStockProducts(5));
-        dashboard.putAll(orderService.getOrderDashboardStats());
+        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            dashboard.putAll(orderService.getOrderDashboardStats());
+        }
         return ResponseEntity.ok(dashboard);
     }
 }

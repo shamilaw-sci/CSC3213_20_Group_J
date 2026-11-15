@@ -9,7 +9,6 @@ const RecentlyViewedSection = ({ currentProductId }) => {
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
 
     // Get sessionId from localStorage or generate one
     let sessionId = localStorage.getItem('icrowd_session_id');

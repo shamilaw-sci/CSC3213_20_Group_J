@@ -14,6 +14,11 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+    @Query("select p.id,p.category.id,p.brand,max(o.createdAt) from OrderItem i join i.order o join i.product p where o.user.id=:userId and o.status in :statuses and o.paymentStatus in :payments group by p.id,p.category.id,p.brand")
+    java.util.List<Object[]> purchaseAffinity(@Param("userId") Long userId,@Param("statuses") java.util.Set<OrderStatus> statuses,@Param("payments") java.util.Set<PaymentStatus> payments);
+
+    org.springframework.data.domain.Page<Order> findByUserEmailOrderByCreatedAtDesc(String email, org.springframework.data.domain.Pageable pageable);
+
     @Modifying
     @Query("UPDATE Order o SET o.status = com.icrowd_api.features.order.OrderStatus.CANCELLED WHERE o.status = com.icrowd_api.features.order.OrderStatus.PENDING_PAYMENT AND o.createdAt < :cutoff AND NOT EXISTS (SELECT p.id FROM Payment p WHERE p.order = o)")
     int expireUnstarted(@Param("cutoff") java.time.LocalDateTime cutoff);
@@ -24,6 +29,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByUserIdAndCheckoutKey(Long userId, String checkoutKey);
     List<Order> findByUserId(Long userId);
+    long countByUserIdAndReceiptFileNameIsNotNull(Long userId);
     List<Order> findByUserEmailOrderByCreatedAtDesc(String email);
 
     /**
@@ -53,7 +59,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByStatus(OrderStatus status);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN (com.icrowd_api.features.order.OrderStatus.CANCELLED, com.icrowd_api.features.order.OrderStatus.FAILED)")
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status IN ('CONFIRMED','PROCESSING','SHIPPED','DELIVERED','COMPLETED') AND o.paymentStatus IN ('SUCCESS','PAID','DUE_ON_DELIVERY')")
     BigDecimal calculateTotalRevenue();
 
     List<Order> findTop5ByOrderByCreatedAtDesc();
@@ -62,7 +68,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * Used by PromoCodeService to determine if a customer is "new"
      * (zero delivered/completed orders) for NEW_CUSTOMERS promo eligibility.
      */
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'COMPLETED', 'DELIVERED')")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'DELIVERED')")
     long countCompletedOrdersByUserId(@Param("userId") Long userId);
 
     @Query("SELECT DISTINCT oi.product.category.id FROM OrderItem oi JOIN oi.order o WHERE o.user.id = :userId AND o.status IN ('CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')")

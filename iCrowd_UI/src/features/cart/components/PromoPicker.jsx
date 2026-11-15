@@ -4,7 +4,7 @@ import { Tag, X } from 'lucide-react';
 import { apiClient } from '../../../lib/axios';
 import { formatLkr } from '../../../lib/currency';
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useCart } from '../hooks/CartContext';
+import { useCart } from '../hooks/cartState';
 
 function PromoDialog({ total, onClose }) {
   const { isAuthenticated } = useAuth();

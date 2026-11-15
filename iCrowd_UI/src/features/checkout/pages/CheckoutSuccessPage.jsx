@@ -1,12 +1,14 @@
 import SwitchToCodButton from '../components/SwitchToCodButton';
-import { useCart } from '../../cart/hooks/CartContext';
-import React, { useState, useEffect } from 'react';
+import { useCart } from '../../cart/hooks/cartState';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, Mail, Package, CreditCard, Loader2, AlertTriangle, RefreshCw, ShieldCheck, MapPin } from 'lucide-react';
 import { getPaymentStatus, initiatePayment, submitPayHereCheckout } from '../api/checkoutApi';
 
 const CheckoutSuccessPage = () => {
   const { removeFromCart, completeCheckout } = useCart();
+  const finishCart = useEffectEvent((id,items) => completeCheckout(id,items));
+  const removeUnavailable = useEffectEvent(id => removeFromCart(id));
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
@@ -32,13 +34,13 @@ const CheckoutSuccessPage = () => {
 
         setOrderData(data);
         if (data.orderStatus === 'STOCK_UNAVAILABLE') {
-          if (data.unavailableProductId) removeFromCart(data.unavailableProductId);
+          if (data.unavailableProductId) removeUnavailable(data.unavailableProductId);
           sessionStorage.removeItem('checkoutData');
           setLoading(false);
           return;
         }
         if (data.paymentStatus === 'SUCCESS' || data.paymentStatus === 'DUE_ON_DELIVERY') {
-          completeCheckout(data.orderId, data.items || []);
+          finishCart(data.orderId, data.items || []);
           sessionStorage.removeItem('checkoutData');
         }
 
@@ -105,6 +107,13 @@ const CheckoutSuccessPage = () => {
       </div>
     );
   }
+
+  if (['CHARGEBACK','REVIEW_REQUIRED','REFUND_PENDING','REFUNDED'].includes(orderData?.paymentStatus) &&
+      !(orderData?.orderStatus === 'STOCK_UNAVAILABLE' && ['REFUND_PENDING', 'REFUNDED'].includes(orderData?.paymentStatus))) return <div className="max-w-xl mx-auto py-16 px-4 text-center">
+    <h1 className="text-2xl font-bold">{{CHARGEBACK:'Payment disputed',REVIEW_REQUIRED:'Payment under review',REFUND_PENDING:'Refund in progress',REFUNDED:'Payment refunded'}[orderData.paymentStatus]}</h1>
+    <p className="my-4">Order {orderData.orderReference || targetOrderId}. {orderData.paymentStatus==='REVIEW_REQUIRED' ? 'Support is checking the payment. Please wait for confirmation before trying to pay again.' : 'Contact support if you need help with this payment.'}</p>
+    <button onClick={() => setPollCount(count => count+1)} className="border rounded-xl p-3">Check status</button><Link className="block mt-4 underline" to="/profile">View orders</Link>
+  </div>;
 
   const isConfirmed = orderData?.paymentStatus === 'SUCCESS' ||
                       orderData?.paymentStatus === 'DUE_ON_DELIVERY' ||

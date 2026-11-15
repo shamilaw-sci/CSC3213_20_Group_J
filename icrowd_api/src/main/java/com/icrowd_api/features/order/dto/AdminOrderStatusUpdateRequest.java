@@ -13,5 +13,6 @@ public class AdminOrderStatusUpdateRequest {
     @NotNull(message = "Order status is required")
     private OrderStatus status;
 
+    @jakarta.validation.constraints.Size(max = 500, message = "The tracking note must be at most 500 characters")
     private String note;
 }

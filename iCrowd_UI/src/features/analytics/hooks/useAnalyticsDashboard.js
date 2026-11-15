@@ -36,7 +36,7 @@ export const useAnalyticsDashboard = (initialRange = 'all') => {
     } finally {
       setLoading(false);
     }
-  }, [range, customStartDate, customEndDate, demoMode]);
+  }, [range, customStartDate, customEndDate, demoMode, grain]);
 
   useEffect(() => {
     loadData();

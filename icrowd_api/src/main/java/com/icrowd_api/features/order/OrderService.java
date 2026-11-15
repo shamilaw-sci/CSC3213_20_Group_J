@@ -32,6 +32,9 @@ public class OrderService {
     private StockAllocationService stockAllocationService;
 
     @Autowired
+    private com.icrowd_api.features.audit.AuditLogRepository auditLogRepository;
+
+    @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
@@ -188,6 +191,13 @@ public class OrderService {
      */
     @Transactional
     public CreateOrderResponse createNewOrder(String email, CreateOrderRequest request) {
+        if (request == null || !StringUtils.hasText(request.getShippingFullName())
+                || !StringUtils.hasText(request.getShippingPhone()) || !StringUtils.hasText(request.getShippingEmail())
+                || !StringUtils.hasText(request.getShippingAddress()) || !StringUtils.hasText(request.getShippingDistrict()))
+            throw new IllegalArgumentException("Complete the recipient, phone, email and delivery address.");
+        if (request.getItems() != null && request.getItems().size() > 100)
+            throw new IllegalArgumentException("An order may contain at most 100 lines.");
+
         User user = userRepository.findForCheckout(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -264,7 +274,7 @@ public class OrderService {
                     .product(product)
                     .quantity(itemDto.getQuantity())
                     .priceAtTimeOfPurchase(product.getPrice())
-                    .costPriceAtTimeOfPurchase(product.getEffectiveCostPrice())
+                    .costPriceAtTimeOfPurchase(product.getCostPrice())
                     .build();
 
             order.getItems().add(orderItem);
@@ -275,10 +285,11 @@ public class OrderService {
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (StringUtils.hasText(request.getPromoCode())) {
-            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            PromoValidationResponse validation = promoCodeService.lockAndValidateCode(request.getPromoCode(), email, subTotal);
             if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
             discount = validation.getDiscountAmount();
         }
+        discount = discount.max(BigDecimal.ZERO).min(subTotal);
         order.setDiscountAmount(discount);
 
         BigDecimal shippingCost = shippingPolicy.getDeliveryFee(request.getDeliveryType());
@@ -313,8 +324,7 @@ public class OrderService {
     public CreateOrderResponse switchToCod(String email, Long orderId) {
         // Use the same order lock as payment initiation and provider notifications.
         Order order = orderRepository.findForUpdate(orderId).orElseThrow();
-        if (!order.getUser().getEmail().equalsIgnoreCase(email))
-            throw new IllegalArgumentException("Access denied");
+        OrderAccess.requireOwner(userRepository, order, email);
         if (order.getPaymentMethod() == PaymentMethod.COD && order.isStockAllocated()
                 && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY)
             return orderResponse(order);
@@ -329,6 +339,8 @@ public class OrderService {
         if (order.getPaymentMethod() != PaymentMethod.CARD || order.isStockAllocated()
                 || (!isFailedCardPayment && !isUninitiatedCardPayment))
             throw new IllegalArgumentException("Switching to COD requires a confirmed failed card payment. Pending payments must be verified first.");
+        if (order.getAppliedPromoCode() != null && !promoCodeService.confirmReservation(order))
+            throw new IllegalArgumentException("This promotion is no longer available. Start a new checkout.");
         if (!stockAllocationService.allocate(order))
             throw new OutOfStockException(order.getUnavailableProductId(), order.getUnavailableProductName());
         order.setPaymentMethod(PaymentMethod.COD);
@@ -363,9 +375,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
 
-        if (!order.getUser().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("Access denied: You do not have permission to view order #" + orderId);
-        }
+        OrderAccess.requireOwner(userRepository, order, email);
 
         String estimatedDelivery = shippingPolicy.getEstimatedDelivery(order.getDeliveryType());
 
@@ -522,6 +532,7 @@ public class OrderService {
     public Page<AdminOrderSummaryDto> getOrdersForAdmin(Pageable pageable, String search, OrderStatus status) {
         Page<Order> orderPage;
         String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        if (cleanSearch != null && cleanSearch.length() > 200) throw new IllegalArgumentException("Search must be at most 200 characters.");
 
         if (cleanSearch != null) {
             orderPage = orderRepository.searchOrdersAdmin(cleanSearch, status, pageable);
@@ -537,23 +548,43 @@ public class OrderService {
     @Transactional(readOnly = true)
     public AdminOrderSummaryDto getOrderDetailsForAdmin(Long orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Order not found"));
         return convertToAdminSummaryDto(order);
     }
 
     @Transactional
-    public AdminOrderSummaryDto updateOrderStatusByAdmin(Long orderId, OrderStatus newStatus, String adminEmail) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
+    public AdminOrderSummaryDto updateOrderStatusByAdmin(Long orderId, OrderStatus newStatus, String adminEmail, String note) {
+        if (newStatus == null) throw new IllegalArgumentException("Order status is required.");
+        if (note != null && note.length() > 500) throw new IllegalArgumentException("The tracking note must be at most 500 characters.");
+        // Use the same lock as checkout and payment callbacks: stock can be released only once.
+        Order order = orderRepository.findForUpdate(orderId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Order not found"));
 
         OrderStatus oldStatus = order.getStatus();
         if (oldStatus == newStatus) {
             return convertToAdminSummaryDto(order);
         }
 
-        // If transitioning to CANCELLED, release stock if allocated
+        var fulfillment = List.of(OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED);
         if (newStatus == OrderStatus.CANCELLED) {
+            if (!List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.FAILED, OrderStatus.CONFIRMED, OrderStatus.PROCESSING).contains(oldStatus))
+                throw new IllegalStateException("Only unshipped active orders can be cancelled here.");
+            boolean cancellablePayment = order.getPaymentStatus() == PaymentStatus.PENDING
+                    || order.getPaymentStatus() == PaymentStatus.FAILED || order.getPaymentStatus() == PaymentStatus.CANCELLED
+                    || (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY);
+            if (!cancellablePayment || paymentRepository.findByOrderId(orderId).stream().anyMatch(p ->
+                    p.getStatus() != PaymentStatus.FAILED && p.getStatus() != PaymentStatus.CANCELLED))
+                throw new IllegalStateException("Paid or unresolved payments require payment review before cancellation.");
             releaseOrderStock(order);
+            order.setPaymentStatus(PaymentStatus.CANCELLED);
+        } else {
+            if (!fulfillment.contains(oldStatus) || !fulfillment.contains(newStatus)
+                    || fulfillment.indexOf(newStatus) <= fulfillment.indexOf(oldStatus))
+                throw new IllegalStateException("Fulfillment can only move an active order forward.");
+            boolean payable = order.getPaymentStatus() == PaymentStatus.SUCCESS || order.getPaymentStatus() == PaymentStatus.PAID
+                    || (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY);
+            if (!order.isStockAllocated() || !payable)
+                throw new IllegalStateException("Stock must be allocated and payment verified (or due on delivery) before fulfillment.");
         }
 
         // If completing a Cash on Delivery order, mark payment as SUCCESS
@@ -565,6 +596,10 @@ public class OrderService {
 
         order.setStatus(newStatus);
         Order updated = orderRepository.save(order);
+        auditLogRepository.save(com.icrowd_api.features.audit.AuditLog.builder()
+                .actorEmail(adminEmail).action("ORDER_STATUS_CHANGE").entityType("ORDER").entityId(orderId)
+                .details(oldStatus + " -> " + newStatus + (StringUtils.hasText(note) ? ": " + note.trim() : ""))
+                .build());
 
         return convertToAdminSummaryDto(updated);
     }

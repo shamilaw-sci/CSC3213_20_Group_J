@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingCart, ShoppingBag } from 'lucide-react';
-import { useCart } from '../../features/cart/hooks/CartContext';
+import { useCart } from '../../features/cart/hooks/cartState';
 import { Link } from 'react-router-dom';
 
 const AddToCartButton = ({ product, className = '' }) => {
