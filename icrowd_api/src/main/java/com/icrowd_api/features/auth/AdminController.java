@@ -3,6 +3,7 @@ package com.icrowd_api.features.auth;
 import com.icrowd_api.features.auth.dto.AdminUserSummaryDto;
 import com.icrowd_api.features.auth.dto.ReauthRequest;
 import com.icrowd_api.features.category.CategoryService;
+import com.icrowd_api.features.order.OrderService;
 import com.icrowd_api.features.product.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,9 @@ public class AdminController {
 
     @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private OrderService orderService;
 
     // ── User Management ────────────────────────────────────────────────────────
 
@@ -139,6 +143,7 @@ public class AdminController {
         dashboard.put("totalUsers", userService.getAllUsers().size());
         dashboard.put("recentProducts", productService.getRecentProducts(5));
         dashboard.put("lowStockProducts", productService.getLowStockProducts(5));
+        dashboard.putAll(orderService.getOrderDashboardStats());
         return ResponseEntity.ok(dashboard);
     }
 }

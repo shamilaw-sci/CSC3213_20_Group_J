@@ -3,7 +3,7 @@ import { apiClient } from '../../../lib/axios';
 
 export const orderLabel = order => order.status === 'STOCK_UNAVAILABLE'
   ? order.paymentStatus === 'REFUNDED' ? 'Refunded' : 'Refund in progress'
-  : ({ PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PROCESSING: 'Preparing your order', COMPLETED: 'Delivered', FAILED: 'Payment unsuccessful', CANCELLED: 'Cancelled' }[order.status] || 'Order received');
+  : ({ PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PROCESSING: 'Preparing your order', SHIPPED: 'Dispatched / In Transit', DELIVERED: 'Delivered', COMPLETED: 'Completed', FAILED: 'Payment unsuccessful', CANCELLED: 'Cancelled' }[order.status] || 'Order received');
 
 export function useOrders() {
   const [orders, setOrders] = useState([]);
