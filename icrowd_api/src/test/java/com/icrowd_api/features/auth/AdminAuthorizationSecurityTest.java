@@ -85,6 +85,8 @@ public class AdminAuthorizationSecurityTest {
 
     @Mock
     private OrderService orderService;
+    @Mock private com.icrowd_api.features.order.OrderRepository orderRepository;
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path receiptDirectory;
 
     @InjectMocks
     private UserService userService;
@@ -106,6 +108,9 @@ public class AdminAuthorizationSecurityTest {
 
     @BeforeEach
     void setUp() {
+        var receiptService = new com.icrowd_api.features.order.ReceiptService(orderRepository,userRepository);
+        ReflectionTestUtils.setField(receiptService,"directory",receiptDirectory.toString());
+        ReflectionTestUtils.setField(orderController,"receipts",receiptService);
         // Wire up inter-service dependencies for controllers
         ReflectionTestUtils.setField(adminController, "userService", userService);
 
@@ -418,66 +423,72 @@ public class AdminAuthorizationSecurityTest {
 
         @Test
         @DisplayName("Customer cannot upload receipt to another customer's order")
-        void testCustomerCannotUploadReceiptToOtherOrder() {
+        void testCustomerCannotUploadReceiptToOtherOrder() throws Exception {
             Order order = Order.builder()
                     .id(100L)
                     .user(activeCustomerUser) // Owned by bob@test.com
                     .build();
 
-            when(orderService.findById(100L)).thenReturn(order);
+            when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
 
             // Eve (another customer) tries to upload a receipt
             Authentication eveAuth = new UsernamePasswordAuthenticationToken(
                     "eve@test.com", null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
 
-            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "content".getBytes());
+            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "%PDF-1.7 test receipt".getBytes());
 
-            ResponseEntity<?> response = orderController.uploadReceipt(100L, file, eveAuth);
-
-            assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+            var denied = assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> orderController.uploadReceipt(100L, file, eveAuth));
+            assertEquals(HttpStatus.FORBIDDEN,denied.getStatusCode());
             verify(orderService, never()).updateReceiptUrl(anyLong(), anyString());
         }
 
         @Test
         @DisplayName("Order owner is allowed to upload receipt to their own order")
-        void testOwnerCanUploadReceipt() {
+        void testOwnerCanUploadReceipt() throws Exception {
             Order order = Order.builder()
                     .id(100L)
                     .user(activeCustomerUser) // Owned by bob@test.com
                     .build();
 
-            when(orderService.findById(100L)).thenReturn(order);
+            when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
 
             Authentication bobAuth = new UsernamePasswordAuthenticationToken(
                     "bob@test.com", null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
 
-            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "content".getBytes());
+            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "%PDF-1.7 test receipt".getBytes());
 
+            when(orderRepository.findForUpdate(100L)).thenReturn(Optional.of(order));
+            when(userRepository.findForCheckout("bob@test.com")).thenReturn(Optional.of(activeCustomerUser));
+            when(userRepository.findByEmail("bob@test.com")).thenReturn(Optional.of(activeCustomerUser));
             ResponseEntity<?> response = orderController.uploadReceipt(100L, file, bobAuth);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
-            verify(orderService).updateReceiptUrl(eq(100L), anyString());
+            assertEquals("/api/orders/100/receipt",order.getReceiptUrl());
+            assertTrue(java.nio.file.Files.exists(receiptDirectory.resolve("100.receipt")));
         }
 
         @Test
         @DisplayName("Admin is permitted to upload receipt to any customer order")
-        void testAdminCanUploadReceiptToAnyOrder() {
+        void testAdminCanUploadReceiptToAnyOrder() throws Exception {
             Order order = Order.builder()
                     .id(100L)
                     .user(activeCustomerUser) // Owned by bob@test.com
                     .build();
 
-            when(orderService.findById(100L)).thenReturn(order);
+            when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
 
             Authentication adminAuth = new UsernamePasswordAuthenticationToken(
                     "admin@test.com", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
-            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "content".getBytes());
+            MockMultipartFile file = new MockMultipartFile("file", "receipt.jpg", "image/jpeg", "%PDF-1.7 test receipt".getBytes());
 
+            when(orderRepository.findForUpdate(100L)).thenReturn(Optional.of(order));
+            when(userRepository.findForCheckout("bob@test.com")).thenReturn(Optional.of(activeCustomerUser));
             ResponseEntity<?> response = orderController.uploadReceipt(100L, file, adminAuth);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
-            verify(orderService).updateReceiptUrl(eq(100L), anyString());
+            assertEquals("/api/orders/100/receipt",order.getReceiptUrl());
+            assertTrue(java.nio.file.Files.exists(receiptDirectory.resolve("100.receipt")));
         }
     }
 
@@ -510,7 +521,7 @@ public class AdminAuthorizationSecurityTest {
                     45,                       // Stock changed
                     List.of(),
                     List.of(),
-                    true
+                      true, null, null, 0L
             );
 
             // Test product service directly with mocked repos

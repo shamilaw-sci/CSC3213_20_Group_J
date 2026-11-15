@@ -10,6 +10,14 @@ import java.math.BigDecimal;
 
 @Repository
 public interface PromoCodeUsageRepository extends JpaRepository<PromoCodeUsage, Long> {
+    @Query("SELECT COUNT(u) FROM PromoCodeUsage u WHERE u.promoCode = :promo " +
+           "AND (:customer IS NULL OR u.customer = :customer) " +
+           "AND (:excludedOrder IS NULL OR u.order.id <> :excludedOrder) " +
+           "AND (u.order IS NULL OR u.order.status IN ('CONFIRMED','PROCESSING','SHIPPED','DELIVERED','COMPLETED') " +
+           "OR (u.order.status IN ('PENDING_PAYMENT','FAILED') AND u.order.createdAt > :cutoff))")
+    long countReserved(@Param("promo") PromoCode promo, @Param("customer") User customer,
+                       @Param("excludedOrder") Long excludedOrder, @Param("cutoff") java.time.LocalDateTime cutoff);
+
 
     @Query("SELECT COUNT(u) FROM PromoCodeUsage u WHERE u.promoCode = :promoCode AND u.customer = :customer " +
            "AND (u.order IS NULL OR u.order.status IN (com.icrowd_api.features.order.OrderStatus.CONFIRMED, " +

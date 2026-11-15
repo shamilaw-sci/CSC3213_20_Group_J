@@ -29,6 +29,7 @@ public class OrderItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -42,14 +43,13 @@ public class OrderItem {
     private BigDecimal priceAtTimeOfPurchase;
 
     @Column(precision = 10, scale = 2)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private BigDecimal costPriceAtTimeOfPurchase;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public BigDecimal getEffectiveCostPrice() {
-        if (costPriceAtTimeOfPurchase != null && costPriceAtTimeOfPurchase.compareTo(BigDecimal.ZERO) > 0) {
+        if (costPriceAtTimeOfPurchase != null && costPriceAtTimeOfPurchase.compareTo(BigDecimal.ZERO) >= 0) {
             return costPriceAtTimeOfPurchase;
-        }
-        if (product != null) {
-            return product.getEffectiveCostPrice();
         }
         if (priceAtTimeOfPurchase != null) {
             return priceAtTimeOfPurchase.multiply(new BigDecimal("0.60")).setScale(2, java.math.RoundingMode.HALF_UP);

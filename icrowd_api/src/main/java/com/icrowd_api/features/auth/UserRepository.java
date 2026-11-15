@@ -17,6 +17,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     boolean existsByRole(String role);
     boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.role = 'ADMIN' ORDER BY u.id")
+    java.util.List<User> lockAdministrators();
 
     long countByRoleAndAccountStatus(String role, String accountStatus);
 

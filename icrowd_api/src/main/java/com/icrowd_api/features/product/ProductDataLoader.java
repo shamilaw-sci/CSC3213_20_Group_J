@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@org.springframework.context.annotation.Profile({"local", "demo"})
 @Configuration
 public class ProductDataLoader {
 
@@ -839,30 +840,10 @@ public class ProductDataLoader {
                     p.setLeadTimeDays(7);
                 }
 
-                Product existing = productRepository.findBySku(p.getSku()).orElse(null);
-                if (existing != null) {
-                    existing.setName(p.getName());
-                    existing.setDescription(p.getDescription());
-                    existing.setCategory(p.getCategory());
-                    existing.setPrice(p.getPrice());
-                    existing.setCostPrice(p.getCostPrice());
-                    existing.setLeadTimeDays(p.getLeadTimeDays());
-                    existing.setAvailableStock(p.getAvailableStock());
-                    existing.setImageUrls(p.getImageUrls());
-                    existing.setTags(p.getTags());
-                    existing.setBrand(p.getBrand());
-                    existing.setWarranty(p.getWarranty());
-                    existing.setDeliveryInfo(p.getDeliveryInfo());
-                    existing.setFeatures(p.getFeatures());
-                    existing.setSpecifications(p.getSpecifications());
-                    existing.setIsActive(true);
-                    productRepository.save(existing);
-                } else {
-                    productRepository.save(p);
-                }
+                if (!productRepository.existsBySku(p.getSku())) productRepository.save(p);
             }
 
-            System.out.println("All 25 Real Tech Products loaded and updated in the database.");
+            System.out.println("All 25 Real Tech Products seeded when absent; existing inventory preserved.");
         };
     }
 }

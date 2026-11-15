@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '../../../lib/axios';
-import { useAuth } from '../../auth/context/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 
 export const useReviews = (productId) => {
     const [reviews, setReviews] = useState([]);

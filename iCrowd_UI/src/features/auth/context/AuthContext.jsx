@@ -1,127 +1,70 @@
-import React, { createContext, useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getCurrentUser, loginUser, registerUser, logoutUser } from '../api/authApi';
-
-export const AuthContext = createContext(null);
+import { AuthContext } from './authState';
+import { setSessionToken, clearSession } from '../../../lib/session';
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [initializing, setInitializing] = useState(true);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        const initAuth = async () => {
-            localStorage.removeItem('checkoutData');
-            localStorage.removeItem('iCrowd_cart');
-            const token = localStorage.getItem('token');
-            if (token) {
-                try {
-                    const userData = await getCurrentUser();
-                    setUser(userData);
-                } catch (err) {
-                    console.error("Failed to fetch user:", err);
-                    localStorage.removeItem('token');
-                }
-            }
-            setLoading(false);
-            setInitializing(false);
-        };
-        initAuth();
-    }, []);
-
-    const login = async (credentials) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await loginUser(credentials);
-            if (data.token) {
-                sessionStorage.removeItem('checkoutData');
-                localStorage.setItem('token', data.token);
-                setUser(data.user);
-                return data.user;
-            }
-        } catch (err) {
-            setError(err.response?.data?.message || 'Login failed');
-            throw err;
-        } finally {
-            setLoading(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [error, setError] = useState(null);
+  const [credential, setCredential] = useState(null);
+  const generation = useRef(0);
+  useEffect(() => {
+    let active = true;
+    const synchronize = async () => {
+      const revision = ++generation.current;
+      const token = localStorage.getItem('token');
+      setSessionToken(null); setCredential(null); setUser(null); setInitializing(true);
+      try {
+        if (token) {
+          const next = await getCurrentUser(token);
+          if (!active || revision !== generation.current || token !== localStorage.getItem('token')) return;
+          try { const checkout=JSON.parse(sessionStorage.getItem('checkoutData') || 'null'); if(checkout && checkout.owner!==String(next.id || next.email)) sessionStorage.removeItem('checkoutData'); } catch { sessionStorage.removeItem('checkoutData'); }
+          setSessionToken(token); setCredential(token); setUser(next);
         }
+      } catch (err) {
+        if (!active || revision !== generation.current) return;
+        if (err.response?.status === 401 && localStorage.getItem('token') === token) localStorage.removeItem('token');
+        else setError('Your account could not be loaded. Please sign in again or refresh.');
+      } finally {
+        if (active && revision === generation.current) { setLoading(false); setInitializing(false); }
+      }
     };
-
-    const register = async (userData) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await registerUser(userData);
-            return response;
-        } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
-            throw err;
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const logout = async () => {
-        try {
-            await logoutUser();
-        } catch {
-            // Clear local session even if the logout request fails.
-        } finally {
-            localStorage.removeItem('token');
-
-            // Remove sensitive cached data on logout and reset state
-            const keysToRemove = [];
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-
-                if (
-                    key && (
-                        key.startsWith('user_addresses_') ||
-                        key === 'user_addresses_default' ||
-                        key.startsWith('user_profile_') ||
-                        key === 'iCrowd_cart' ||
-                        key.startsWith('completed-order-') ||
-                        key.startsWith('iCrowd_')
-                    )
-                ) {
-                    keysToRemove.push(key);
-                }
-            }
-
-            keysToRemove.forEach(k => localStorage.removeItem(k));
-
-            // Clear checkout and cart-related session data
-            sessionStorage.removeItem('checkoutData');
-            sessionStorage.removeItem('iCrowd_guest_cart');
-
-            // Clear remaining session data for security
-            try {
-                sessionStorage.clear();
-            } catch (e) {
-                console.warn('Could not clear session storage:', e);
-            }
-
-            setUser(null);
-        }
-    };
-
-    const updateUser = (updatedUserData) => {
-        setUser(prev => ({ ...prev, ...updatedUserData }));
-    };
-
-    const isAdmin = user?.role === 'ADMIN';
-    const isAuthenticated = !!user;
-
-    const clearError = () => setError(null);
-
-    return (
-        <AuthContext.Provider value={{ user, loading, initializing, error, isAdmin, isAuthenticated, login, register, logout, updateUser, clearError }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    const storage = event => { if (event.key === 'token' || event.key === null) { sessionStorage.clear(); synchronize(); } };
+    const expired = () => { ++generation.current; setUser(null); setCredential(null); setInitializing(false); setLoading(false); };
+    synchronize();
+    window.addEventListener('storage', storage); window.addEventListener('session-expired', expired);
+    return () => { active = false; window.removeEventListener('storage', storage); window.removeEventListener('session-expired', expired); };
+  }, []);
+  const login = async credentials => {
+    const revision = ++generation.current;
+    setLoading(true); setError(null);
+    try {
+      const data = await loginUser(credentials);
+      if (revision !== generation.current) return null;
+      if (data.token) {
+        sessionStorage.removeItem('checkoutData');
+        localStorage.setItem('token', data.token); setSessionToken(data.token); setCredential(data.token); setUser(data.user);
+        return data.user;
+      }
+    } catch (err) { setError(err.response?.data?.message || 'Login failed'); throw err; }
+    finally { if (revision === generation.current) { setLoading(false); setInitializing(false); } }
+  };
+  const register = async data => {
+    setLoading(true); setError(null);
+    try { return await registerUser(data); }
+    catch (err) { setError(err.response?.data?.message || 'Registration failed'); throw err; }
+    finally { setLoading(false); }
+  };
+  const logout = async () => {
+    const token = credential;
+    const request = logoutUser();
+    clearSession(token);
+    await request;
+  };
+  return <AuthContext.Provider value={{ user, credential, loading, initializing, error,
+    isAdmin: user?.role === 'ADMIN', isAuthenticated: !!user, login, register, logout,
+    updateUser: data => setUser(previous => previous ? { ...previous, ...data } : null), clearError: () => setError(null),
+  }}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => React.useContext(AuthContext);
-

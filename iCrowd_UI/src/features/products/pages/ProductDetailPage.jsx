@@ -15,7 +15,7 @@ import ProductSpecs from '../components/ProductSpecs';
 import AddToCartButton from '../../../components/ui/AddToCartButton';
 import BuyNowButton from '../../../components/ui/BuyNowButton';
 
-const ProductDetailPage = () => {
+const ProductDetailContent = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const promo = searchParams.get('promo')?.slice(0, 50);
@@ -27,7 +27,6 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
-    setSimilarLoading(true);
 
     fetchSimilarProducts(id, 8)
       .then((data) => {
@@ -176,4 +175,4 @@ const ProductDetailPage = () => {
   );
 };
 
-export default ProductDetailPage;
+export default function ProductDetailPage() { const { id } = useParams(); return <ProductDetailContent key={id}/>; }

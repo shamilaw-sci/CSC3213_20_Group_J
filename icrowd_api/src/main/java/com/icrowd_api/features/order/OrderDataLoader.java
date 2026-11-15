@@ -18,10 +18,10 @@ import java.util.stream.Collectors;
 
 /**
  * Seeds realistic demonstration orders across the last 6 months (June - November 2026).
- * Restricted to non-production profiles (@Profile("!prod")).
+ * Restricted to non-production profiles (@Profile("demo").
  */
 @Component
-@Profile("!prod")
+@Profile("demo")
 @Order(3)
 public class OrderDataLoader implements CommandLineRunner {
 
@@ -98,7 +98,7 @@ public class OrderDataLoader implements CommandLineRunner {
                             .product(product)
                             .quantity(itemSeed.quantity)
                             .priceAtTimeOfPurchase(product.getPrice())
-                            .costPriceAtTimeOfPurchase(product.getEffectiveCostPrice())
+                            .costPriceAtTimeOfPurchase(product.getCostPrice())
                             .build();
                     order.getItems().add(orderItem);
                 }

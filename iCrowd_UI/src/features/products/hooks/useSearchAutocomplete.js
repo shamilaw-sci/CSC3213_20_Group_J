@@ -12,24 +12,23 @@ export const useSearchAutocomplete = (initialKeyword, onSearch) => {
 
   const debouncedKeyword = useDebounce(keyword, 300);
 
-  // Sync internal state if the URL changes externally
-  useEffect(() => {
-    setKeyword(initialKeyword || '');
-  }, [initialKeyword]);
+  const [previousInitial,setPreviousInitial]=useState(initialKeyword);
+  if(previousInitial!==initialKeyword) { setPreviousInitial(initialKeyword);setKeyword(initialKeyword || '');setShowSuggestions(false); }
 
   // Fetch suggestions when debouncedKeyword changes
   useEffect(() => {
-    if (debouncedKeyword.trim().length > 1) {
-      fetchSuggestions(debouncedKeyword).then(data => {
-        setSuggestions(data);
+    let current = true;
+    const controller = new AbortController();
+    if (debouncedKeyword.trim().length > 1 && debouncedKeyword===keyword) {
+      fetchSuggestions(debouncedKeyword, controller.signal).then(data => {
+        if (!current) return;
+        setSuggestions({...data, query:debouncedKeyword});
         const hasResults = data.terms.length > 0 || data.categories.length > 0 || data.products.length > 0;
         setShowSuggestions(hasResults);
-      });
-    } else {
-      setSuggestions({ terms: [], categories: [], products: [] });
-      setShowSuggestions(false);
+      }).catch(() => {});
     }
-  }, [debouncedKeyword]);
+    return () => { current = false; controller.abort(); };
+  }, [debouncedKeyword, keyword]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -63,7 +62,7 @@ export const useSearchAutocomplete = (initialKeyword, onSearch) => {
     keyword,
     setKeyword,
     suggestions,
-    showSuggestions,
+    showSuggestions: showSuggestions && suggestions.query===keyword && keyword.trim().length>1,
     setShowSuggestions,
     wrapperRef,
     handleSearch,

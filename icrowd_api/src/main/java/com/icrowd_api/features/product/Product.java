@@ -26,6 +26,11 @@ import org.hibernate.annotations.Check;
 @AllArgsConstructor
 @Builder
 public class Product {
+    @Version
+    @org.hibernate.annotations.ColumnDefault("0")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private long version;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,6 +55,7 @@ public class Product {
 
     @PositiveOrZero
     @Column(precision = 10, scale = 2)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private BigDecimal costPrice;
 
     @PositiveOrZero
@@ -58,6 +64,7 @@ public class Product {
 
     @Builder.Default
     @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("7")
     private Integer leadTimeDays = 7;
 
     @ElementCollection
@@ -104,8 +111,9 @@ public class Product {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public BigDecimal getEffectiveCostPrice() {
-        if (costPrice != null && costPrice.compareTo(BigDecimal.ZERO) > 0) {
+        if (costPrice != null && costPrice.compareTo(BigDecimal.ZERO) >= 0) {
             return costPrice;
         }
         if (price != null) {

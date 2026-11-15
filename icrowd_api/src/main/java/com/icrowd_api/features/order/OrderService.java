@@ -186,6 +186,13 @@ public class OrderService {
      */
     @Transactional
     public CreateOrderResponse createNewOrder(String email, CreateOrderRequest request) {
+        if (request == null || !StringUtils.hasText(request.getShippingFullName())
+                || !StringUtils.hasText(request.getShippingPhone()) || !StringUtils.hasText(request.getShippingEmail())
+                || !StringUtils.hasText(request.getShippingAddress()) || !StringUtils.hasText(request.getShippingDistrict()))
+            throw new IllegalArgumentException("Complete the recipient, phone, email and delivery address.");
+        if (request.getItems() != null && request.getItems().size() > 100)
+            throw new IllegalArgumentException("An order may contain at most 100 lines.");
+
         User user = userRepository.findForCheckout(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -262,7 +269,7 @@ public class OrderService {
                     .product(product)
                     .quantity(itemDto.getQuantity())
                     .priceAtTimeOfPurchase(product.getPrice())
-                    .costPriceAtTimeOfPurchase(product.getEffectiveCostPrice())
+                    .costPriceAtTimeOfPurchase(product.getCostPrice())
                     .build();
 
             order.getItems().add(orderItem);
@@ -273,10 +280,11 @@ public class OrderService {
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (StringUtils.hasText(request.getPromoCode())) {
-            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            PromoValidationResponse validation = promoCodeService.lockAndValidateCode(request.getPromoCode(), email, subTotal);
             if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
             discount = validation.getDiscountAmount();
         }
+        discount = discount.max(BigDecimal.ZERO).min(subTotal);
         order.setDiscountAmount(discount);
 
         BigDecimal shippingCost = shippingPolicy.getDeliveryFee(request.getDeliveryType());
@@ -311,8 +319,7 @@ public class OrderService {
     public CreateOrderResponse switchToCod(String email, Long orderId) {
         // Use the same order lock as payment initiation and provider notifications.
         Order order = orderRepository.findForUpdate(orderId).orElseThrow();
-        if (!order.getUser().getEmail().equalsIgnoreCase(email))
-            throw new IllegalArgumentException("Access denied");
+        OrderAccess.requireOwner(userRepository, order, email);
         if (order.getPaymentMethod() == PaymentMethod.COD && order.isStockAllocated()
                 && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY)
             return orderResponse(order);
@@ -327,6 +334,8 @@ public class OrderService {
         if (order.getPaymentMethod() != PaymentMethod.CARD || order.isStockAllocated()
                 || (!isFailedCardPayment && !isUninitiatedCardPayment))
             throw new IllegalArgumentException("Switching to COD requires a confirmed failed card payment. Pending payments must be verified first.");
+        if (order.getAppliedPromoCode() != null && !promoCodeService.confirmReservation(order))
+            throw new IllegalArgumentException("This promotion is no longer available. Start a new checkout.");
         if (!stockAllocationService.allocate(order))
             throw new OutOfStockException(order.getUnavailableProductId(), order.getUnavailableProductName());
         order.setPaymentMethod(PaymentMethod.COD);
@@ -361,9 +370,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
 
-        if (!order.getUser().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("Access denied: You do not have permission to view order #" + orderId);
-        }
+        OrderAccess.requireOwner(userRepository, order, email);
 
         String estimatedDelivery = shippingPolicy.getEstimatedDelivery(order.getDeliveryType());
 

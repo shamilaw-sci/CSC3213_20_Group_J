@@ -99,6 +99,8 @@ public class Order {
     @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
+    private String receiptFileName;
+    private String receiptContentType;
     private String receiptUrl; // Kept for legacy bank transfer upload compatibility
 
     // Promo Code (optional — null when no code was applied)

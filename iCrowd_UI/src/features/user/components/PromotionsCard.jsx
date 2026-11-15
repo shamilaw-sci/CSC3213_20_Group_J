@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import PromoPicker from '../../cart/components/PromoPicker';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 
 export default function PromotionsCard() {
   const { getCartTotal, cart } = useCart();

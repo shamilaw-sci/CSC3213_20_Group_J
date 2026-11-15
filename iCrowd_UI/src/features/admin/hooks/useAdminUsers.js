@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useDebounce } from '../../products/hooks/useDebounce';
 import { getAllUsers, promoteUser, demoteUser, deactivateUser, reactivateUser } from '../api/adminUserApi';
 
 export const useAdminUsers = () => {
@@ -9,11 +10,15 @@ export const useAdminUsers = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const fetchUsers = useCallback(async (page = 0, searchTerm = search, role = roleFilter) => {
+    const debouncedSearch = useDebounce(search,300);
+    const requestId = useRef(0);
+    const fetchUsers = useCallback(async (page = 0, searchTerm = debouncedSearch, role = roleFilter) => {
+        const id=++requestId.current;
         setLoading(true);
         setError(null);
         try {
             const data = await getAllUsers(page, pagination.size, searchTerm, role);
+            if(id!==requestId.current) return;
             setUsers(data.content || []);
             setPagination(prev => ({
                 ...prev,
@@ -22,24 +27,24 @@ export const useAdminUsers = () => {
                 totalElements: data.totalElements,
             }));
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to load users');
+            if(id===requestId.current) setError(err.response?.data?.message || 'Failed to load users');
         } finally {
-            setLoading(false);
+            if(id===requestId.current) setLoading(false);
         }
-    }, [pagination.size, search, roleFilter]);
+    }, [pagination.size, debouncedSearch, roleFilter]);
 
     useEffect(() => {
         fetchUsers(0);
-    }, []);
+    }, [fetchUsers]);
 
     const handleSearch = (term) => {
         setSearch(term);
-        fetchUsers(0, term, roleFilter);
+
     };
 
     const handleRoleFilter = (role) => {
         setRoleFilter(role);
-        fetchUsers(0, search, role);
+
     };
 
     const handlePromote = async (id, password) => {

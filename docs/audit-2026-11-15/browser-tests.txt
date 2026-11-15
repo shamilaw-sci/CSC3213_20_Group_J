@@ -1,0 +1,32 @@
+[WebServer] (node:21476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 23 tests using 1 worker
+
+(node:12936) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 tests\catalog-checkout.spec.js:29:1 › Buy Now adds the item and starts checkout; sold-out items cannot be bought (3.4s)
+  ok  2 tests\catalog-checkout.spec.js:41:1 › cart uses rupees, exposes quantity controls, and shows failed saves (1.9s)
+  ok  3 tests\catalog-checkout.spec.js:52:1 › payment waits for promo validation and submits the validated code (1.8s)
+  ok  4 tests\catalog-checkout.spec.js:73:1 › payment error ignores arbitrary URL text (714ms)
+  ok  5 tests\catalog-checkout.spec.js:80:1 › refund status stays on the order page and can be refreshed (602ms)
+  ok  6 tests\catalog-checkout.spec.js:92:1 › logout removes checkout details and does not expose the account cart to guests (1.1s)
+  ok  7 tests\catalog-checkout.spec.js:102:1 › a different account cannot reuse another account checkout or cached cart (836ms)
+  ok  8 tests\feedback.spec.js:33:1 › customer can create, edit and delete reviews; ratings refresh and products remain separate (2.1s)
+  ok  9 tests\feedback.spec.js:58:1 › questions persist across reloads and staff can answer (1.3s)
+  ok 10 tests\feedback.spec.js:73:1 › guests can read feedback and are invited to sign in (545ms)
+  ok 11 tests\feedback.spec.js:80:1 › load-more prevents duplicate requests and recovers from a failed page (1.2s)
+  ok 12 tests\filtering.spec.js:2:1 › filters combine, reset pagination, survive navigation and clear (7.2s)
+  ok 13 tests\search-correction.spec.js:4:1 › correction requires a unique close catalog word (3ms)
+  ok 14 tests\search-correction.spec.js:27:43 › typo submitted with Enter returns related products and supports original wording (2.2s)
+  ok 15 tests\search-correction.spec.js:27:43 › typo submitted with button returns related products and supports original wording (9.7s)
+  ok 16 tests\search-correction.spec.js:42:1 › correction keeps price, brand and sorting filters (10.4s)
+  ok 17 tests\search-correction.spec.js:52:1 › existing results take priority over correction (13.6s)
+  ok 18 tests\storefront.spec.js:45:1 › search cards have LKR prices, clear actions and 500-rupee price steps (2.0s)
+  ok 19 tests\storefront.spec.js:61:1 › cart offers support selection, manual entry, removal and revalidation (1.3s)
+  ok 20 tests\storefront.spec.js:80:1 › selected cart promo carries through shipping and payment into the order (1.5s)
+  ok 21 tests\storefront.spec.js:102:1 › landing has an electronics image and no public admin or technical footer links (1.6s)
+  ok 22 tests\storefront.spec.js:113:1 › admin can preview and save a banner that appears on the public homepage (2.1s)
+  ok 23 tests\storefront.spec.js:128:1 › order history shows real orders and readable statuses on mobile (935ms)
+
+  23 passed (1.3m)

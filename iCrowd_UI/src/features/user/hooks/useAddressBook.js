@@ -42,7 +42,7 @@ export const useAddressBook = (user) => {
                 if (storageKey) {
                     try {
                         localStorage.removeItem(storageKey);
-                    } catch (e) {
+                    } catch {
                         // ignore storage errors
                     }
                 }

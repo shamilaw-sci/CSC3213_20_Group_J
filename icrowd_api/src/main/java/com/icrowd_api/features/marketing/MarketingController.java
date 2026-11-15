@@ -8,6 +8,16 @@ import java.util.*;
 @RestController @RequiredArgsConstructor
 public class MarketingController {
     private final MarketingService service;
+    private final SubscriptionConfirmation confirmation;
+    @GetMapping(value="/api/marketing/confirm",produces=MediaType.TEXT_HTML_VALUE)
+    public String confirmSubscription(@RequestParam String token) {
+        if (!token.matches("[a-f0-9]{64}")) return "This confirmation link is invalid.";
+        return "<html><body><h1>Confirm email subscription</h1><form method='post'><input type='hidden' name='token' value='"+token+"'><button type='submit'>Subscribe to product updates and offers</button></form></body></html>";
+    }
+    @PostMapping(value="/api/marketing/confirm",produces=MediaType.TEXT_HTML_VALUE)
+    public String subscribe(@RequestParam String token) {
+        return confirmation.confirm(token) ? "<html><body><h1>Your subscription is confirmed.</h1><p>You can unsubscribe at any time.</p></body></html>" : "<html><body><h1>This link has expired or was already used.</h1><p>Request a new confirmation from your account preferences.</p></body></html>";
+    }
     @GetMapping("/api/marketing/preferences")
     public MarketingService.PreferenceView preference(Principal principal) { return service.preference(principal.getName()); }
     @PutMapping("/api/marketing/preferences")

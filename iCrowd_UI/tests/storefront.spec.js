@@ -63,14 +63,14 @@ test('cart offers support selection, manual entry, removal and revalidation', as
   await page.goto('/cart', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Add promo code' }).click();
   await page.getByRole('button', { name: /SAVE100.*Select/ }).click();
-  await expect(page.getByRole('status')).toContainText('SAVE100 applied');
+  await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'SAVE100 applied' })).toBeVisible();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Promo: SAVE100' })).toBeVisible();
   await page.getByRole('button', { name: 'Remove cart promo code' }).click();
   await page.getByRole('button', { name: 'Add promo code' }).click();
   await page.getByLabel('Promo code', { exact: true }).fill('manual');
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('MANUAL applied');
+  await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'MANUAL applied' })).toBeVisible();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await page.getByRole('button', { name: `Decrease quantity of ${product.name}` }).click();
   await expect(page.getByText('Minimum spend is LKR 1,500.')).toBeVisible();
@@ -82,7 +82,7 @@ test('selected cart promo carries through shipping and payment into the order', 
   await page.goto('/cart', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Add promo code' }).click();
   await page.getByRole('button', { name: /SAVE100.*Select/ }).click();
-  await expect(page.getByRole('status')).toContainText('SAVE100 applied');
+  await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'SAVE100 applied' })).toBeVisible();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await page.getByRole('button', { name: 'Proceed to Checkout' }).click();
   await page.getByRole('button', { name: 'Continue to Payment' }).click();

@@ -39,6 +39,7 @@ public class AnalyticsSummaryDto {
     @AllArgsConstructor
     public static class OverviewDto {
         private BigDecimal totalRevenue;
+        private Boolean costsEstimated;
         private BigDecimal totalCost; // Purchase-time Cost of Goods Sold (COGS)
         private BigDecimal grossProfit;
         private BigDecimal netProfit;

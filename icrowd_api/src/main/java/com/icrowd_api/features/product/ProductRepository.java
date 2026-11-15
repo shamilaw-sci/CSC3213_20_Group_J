@@ -14,17 +14,23 @@ import org.springframework.data.jpa.repository.Modifying;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Product> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"category"})
+    Page<Product> findAll(org.springframework.data.jpa.domain.Specification<Product> spec, Pageable pageable);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"category"})
+    @Query("SELECT p FROM Product p WHERE p.isActive=true AND (:term='' OR LOWER(p.name) LIKE CONCAT('%',:term,'%') OR LOWER(p.brand) LIKE CONCAT('%',:term,'%') OR LOWER(p.category.name) LIKE CONCAT('%',:term,'%')) ORDER BY p.id")
+    List<Product> findCatalogCandidates(@Param("term") String term,Pageable pageable);
+
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findForCheckout(@Param("id") Long id);
 
     @Modifying
-    @Query("UPDATE Product p SET p.availableStock = p.availableStock - :quantity WHERE p.id = :productId AND :quantity > 0 AND p.availableStock >= :quantity")
+    @Query("UPDATE Product p SET p.availableStock = p.availableStock - :quantity, p.version = p.version + 1 WHERE p.id = :productId AND :quantity > 0 AND p.availableStock >= :quantity")
     int atomicDecrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
     @Modifying
-    @Query("UPDATE Product p SET p.availableStock = p.availableStock + :quantity WHERE p.id = :productId")
+    @Query("UPDATE Product p SET p.availableStock = p.availableStock + :quantity, p.version = p.version + 1 WHERE p.id = :productId")
     void atomicIncrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
     @Query("SELECT DISTINCT TRIM(p.brand) FROM Product p WHERE p.isActive = true AND LOWER(p.category.name) = LOWER(:category) AND p.brand IS NOT NULL AND TRIM(p.brand) <> ''")
@@ -64,7 +70,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, org.spr
 
     // Low-stock products (stock <= threshold, active only)
     @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.availableStock <= :threshold ORDER BY p.availableStock ASC")
-    List<Product> findLowStockProducts(@Param("threshold") int threshold);
+    List<Product> findLowStockProducts(@Param("threshold") int threshold, Pageable pageable);
 
     // Recent products (admin)
     @Query("SELECT p FROM Product p ORDER BY p.createdAt DESC")

@@ -45,8 +45,8 @@ public class MarketingWorker {
     }
     @Scheduled(fixedDelayString="${app.marketing.interval-ms:60000}")
     public void tick() {
-        if (!initialized) return;
-        // Queue generation is safe with delivery disabled; no SMTP connection is made.
+        if (!initialized || !config.isEnabled()) return;
+        // Preparation and delivery are both paused when marketing is disabled.
         tx.executeWithoutResult(status -> { locks.acquire(); service.prepare(); });
         if (!config.isEnabled()) return;
         validateConfiguration();
@@ -74,7 +74,7 @@ public class MarketingWorker {
             EmailCampaign c = campaigns.findById(d.getCampaignId()).orElse(null);
             Product p = products.findById(d.getProductId()).orElse(null);
             if (!service.activeCustomer(u,pref) || c == null || p == null || service.expired(c) || !service.ready(c) || !service.validPromo(c,u)
-                    || matcher.match(p,pref,orders.findByUserId(u.getId())).score() < 20) {
+                    || matcher.match(p,pref,service.affinity(u.getId())).score() < 20) {
                 d.setStatus("SKIPPED"); continue;
             }
             if (attempts.countByUserIdAndAttemptedAtAfter(u.getId(),now.minus(Duration.ofDays(7))) >= config.getWeeklyCustomerLimit()) {

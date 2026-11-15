@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { CreditCard, Banknote, ShieldCheck, Tag, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { formatLkr } from '../../../lib/currency';
 import { createOrder, initiatePayment, submitPayHereCheckout, validatePromoCode } from '../api/checkoutApi';

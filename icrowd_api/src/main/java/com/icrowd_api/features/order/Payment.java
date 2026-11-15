@@ -58,6 +58,9 @@ public class Payment {
 
     private LocalDateTime initiatedAt;
     private LocalDateTime completedAt;
+    @org.hibernate.annotations.ColumnDefault("0")
+    private int reconcileAttempts;
+    private LocalDateTime nextReconcileAt;
 
     @CreationTimestamp
     @Column(updatable = false)

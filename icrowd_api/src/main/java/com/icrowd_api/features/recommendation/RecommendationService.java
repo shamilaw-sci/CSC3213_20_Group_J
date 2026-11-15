@@ -122,7 +122,7 @@ public class RecommendationService {
             }
         }
 
-        List<Product> allActive = productRepository.findAllActiveProductsList();
+        List<Product> allActive = productRepository.findCatalogCandidates("",PageRequest.of(0,500));
         if (allActive.isEmpty()) return List.of();
 
         // If no user signals are present (Cold Start), return trending products
@@ -182,7 +182,7 @@ public class RecommendationService {
                 .orElse(null);
         if (target == null) return List.of();
 
-        List<Product> allCandidates = productRepository.findAllActiveProductsList();
+        List<Product> allCandidates = productRepository.findCatalogCandidates("",PageRequest.of(0,500));
         Map<Product, Double> similarityScores = new HashMap<>();
 
         Set<String> targetTags = target.getTags() != null
@@ -286,7 +286,7 @@ public class RecommendationService {
             String targetCat = target.getCategory() != null ? target.getCategory().getName() : "";
             List<String> complementaryCats = getComplementaryCategories(targetCat);
 
-            List<Product> candidates = productRepository.findAllActiveProductsList().stream()
+            List<Product> candidates = productRepository.findCatalogCandidates("",PageRequest.of(0,500)).stream()
                     .filter(p -> !p.getId().equals(target.getId()))
                     .filter(p -> p.getAvailableStock() != null && p.getAvailableStock() > 0)
                     .filter(p -> p.getCategory() != null && complementaryCats.contains(p.getCategory().getName()))
@@ -308,7 +308,7 @@ public class RecommendationService {
             }
         }
 
-        int discountPercent = bundled.isEmpty() ? 0 : 8;
+        int discountPercent = 0; // No bundle promotion exists in checkout; show the actual combined price.
         BigDecimal bundleTotal = regularTotal.multiply(BigDecimal.valueOf(100 - discountPercent))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         BigDecimal savings = regularTotal.subtract(bundleTotal);
@@ -341,46 +341,16 @@ public class RecommendationService {
     @Transactional(readOnly = true)
     public List<Product> getTrendingProducts(int days, int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 30));
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(Math.max(1, days));
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(Math.max(1, Math.min(days,90)));
 
-        List<com.icrowd_api.features.order.Order> orders = orderRepository.findAllQualifyingOrders(QUALIFYING_ORDER_STATUSES);
-        LocalDateTime now = LocalDateTime.now();
-        double lambda = Math.log(2) / 7.0; // 7-day half-life decay parameter
-
-        Map<Long, Double> productVelocityMap = new HashMap<>();
-
-        for (com.icrowd_api.features.order.Order order : orders) {
-            if (order.getCreatedAt() != null && order.getCreatedAt().isAfter(cutoff)) {
-                long daysPast = Math.max(0, Duration.between(order.getCreatedAt(), now).toDays());
-                double decayWeight = Math.exp(-lambda * daysPast);
-
-                if (order.getItems() != null) {
-                    for (com.icrowd_api.features.order.OrderItem item : order.getItems()) {
-                        if (item.getProduct() != null && item.getQuantity() != null) {
-                            double addedVelocity = item.getQuantity() * decayWeight;
-                            productVelocityMap.merge(item.getProduct().getId(), addedVelocity, Double::sum);
-                        }
-                    }
-                }
-            }
-        }
-
-        List<Product> trending = new ArrayList<>();
-        if (!productVelocityMap.isEmpty()) {
-            List<Long> rankedIds = productVelocityMap.entrySet().stream()
-                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
-                    .map(Map.Entry::getKey)
-                    .limit(safeLimit)
-                    .collect(Collectors.toList());
-
-            for (Long id : rankedIds) {
-                productRepository.findByIdAndIsActiveTrue(id).ifPresent(trending::add);
-            }
-        }
+        List<Long> rankedIds=orderItemRepository.findTopSellingProductIds(cutoff,PageRequest.of(0,safeLimit));
+        Map<Long,Product> found=productRepository.findAllById(rankedIds).stream().collect(Collectors.toMap(Product::getId,p -> p));
+        List<Product> trending=new ArrayList<>();
+        for (Long id : rankedIds) if(found.containsKey(id) && Boolean.TRUE.equals(found.get(id).getIsActive())) trending.add(found.get(id));
 
         // Fallback / supplement with top-rated and in-stock items
         if (trending.size() < safeLimit) {
-            List<Product> fallback = productRepository.findAllActiveProductsList().stream()
+            List<Product> fallback = productRepository.findCatalogCandidates("",PageRequest.of(0,500)).stream()
                     .filter(p -> !trending.contains(p))
                     .sorted((p1, p2) -> Double.compare(
                             p2.getAverageRating() != null ? p2.getAverageRating() : 0.0,
@@ -429,7 +399,7 @@ public class RecommendationService {
     @Transactional(readOnly = true)
     public List<Product> getBudgetAwareRecommendations(BigDecimal maxPrice, BigDecimal minPrice, String category, int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 20));
-        List<Product> all = productRepository.findAllActiveProductsList();
+        List<Product> all = productRepository.findCatalogCandidates("",PageRequest.of(0,500));
 
         return all.stream()
                 .filter(p -> {

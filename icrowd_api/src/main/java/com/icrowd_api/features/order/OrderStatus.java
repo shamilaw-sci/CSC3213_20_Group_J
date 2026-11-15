@@ -11,5 +11,7 @@ public enum OrderStatus {
     COMPLETED,
     FAILED,
     CANCELLED,
-    REFUNDED
+    REFUNDED,
+    CHARGEBACK,
+    REVIEW_REQUIRED
 }

@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+    public long countUsers() { return userRepository.count(); }
 
     @Autowired
     private UserRepository userRepository;
@@ -42,8 +43,9 @@ public class UserService {
 
     @Transactional
     public String registerUser(RegisterRequest request) {
+        request.setEmail(EmailAddress.canonical(request.getEmail()));
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-        if (existingUser.isPresent()) {
+        if (existingUser.isPresent() || userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             return "Email already exists!";
         }
 
@@ -101,8 +103,9 @@ public class UserService {
      */
     @Transactional
     public String registerAdmin(RegisterRequest request) {
+        request.setEmail(EmailAddress.canonical(request.getEmail()));
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-        if (existingUser.isPresent()) {
+        if (existingUser.isPresent() || userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             return "Email already exists!";
         }
 
@@ -161,6 +164,7 @@ public class UserService {
      * @throws SecurityException if the password does not match.
      */
     public void validateAdminPassword(String adminEmail, String rawPassword) {
+        if (rawPassword == null || rawPassword.isBlank()) throw new SecurityException("Confirm your administrator password.");
         User admin = userRepository.findByEmail(adminEmail)
                 .orElseThrow(() -> new RuntimeException("Admin user not found"));
         if (!passwordEncoder.matches(rawPassword, admin.getPassword())) {
@@ -225,6 +229,7 @@ public class UserService {
 
     @Transactional
     public String demoteToUser(Long id, String actorEmail) {
+        userRepository.lockAdministrators();
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return "User not found";
@@ -286,6 +291,7 @@ public class UserService {
 
     @Transactional
     public void deactivateUser(Long id, String actorEmail) {
+        userRepository.lockAdministrators();
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -298,6 +304,7 @@ public class UserService {
         }
 
         user.setAccountStatus("DEACTIVATED");
+        user.setTokenVersion(user.getTokenVersion() == null ? 1L : user.getTokenVersion() + 1);
         userRepository.save(user);
 
         auditService.log(actorEmail, "ACCOUNT_DEACTIVATION", "USER", user.getId(),

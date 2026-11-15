@@ -12,6 +12,12 @@ import java.util.Optional;
 public interface PromoCodeRepository extends JpaRepository<PromoCode, Long> {
 
     Optional<PromoCode> findByCodeIgnoreCase(String code);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PromoCode p WHERE LOWER(p.code) = LOWER(:code)")
+    Optional<PromoCode> lockByCode(@org.springframework.data.repository.query.Param("code") String code);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PromoCode p WHERE p.id = :id")
+    Optional<PromoCode> lockById(@org.springframework.data.repository.query.Param("id") Long id);
 
     boolean existsByCodeIgnoreCase(String code);
 

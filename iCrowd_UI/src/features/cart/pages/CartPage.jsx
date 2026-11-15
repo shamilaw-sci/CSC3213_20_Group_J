@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCart } from '../hooks/CartContext.jsx';
+import { useCart } from '../hooks/cartState.js';
 import CartItem from '../components/CartItem.jsx';
 import OrderSummary from '../components/OrderSummary.jsx';
 import ProductSlider from '../../products/components/ProductSlider.jsx';
@@ -10,19 +10,19 @@ import { ArrowLeft, ShoppingBag, AlertTriangle } from 'lucide-react';
 const CartPage = () => {
   const { cart, cartLoading, cartReady, syncError, isSyncing, retrySync, retryLoad, updateQuantity, removeFromCart, getCartTotal, getItemCount } = useCart();
   const [suggestions, setSuggestions] = useState([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const [loadedKey, setLoadedKey] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   // Extract cart product IDs
   const cartProductIds = cart.map((i) => i.product.id);
   const cartIdsKey = cartProductIds.sort().join(',');
+  const loadingSuggestions = loadedKey !== cartIdsKey;
 
   useEffect(() => {
     let isMounted = true;
-    setLoadingSuggestions(true);
 
-    fetchCartSuggestions(cartProductIds, 8)
+    fetchCartSuggestions(cartIdsKey ? cartIdsKey.split(',').map(Number) : [], 8)
       .then((data) => {
         if (isMounted) setSuggestions(data || []);
       })
@@ -30,7 +30,7 @@ const CartPage = () => {
         console.error("Error fetching cart suggestions:", err);
       })
       .finally(() => {
-        if (isMounted) setLoadingSuggestions(false);
+        if (isMounted) setLoadedKey(cartIdsKey);
       });
 
     return () => { isMounted = false; };

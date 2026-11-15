@@ -21,9 +21,13 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(com.icrowd_api.features.auth.EmailAddress.canonical(email))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
+        return toUserDetails(user);
+    }
+
+    public UserDetails toUserDetails(User user) {
         // Normalise role — developer branch uses CUSTOMER, HEAD used USER; support both
         String rawRole = user.getRole() != null ? user.getRole().toUpperCase() : "CUSTOMER";
 

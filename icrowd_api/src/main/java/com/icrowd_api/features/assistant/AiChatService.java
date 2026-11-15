@@ -29,10 +29,10 @@ public class AiChatService {
     private final ShippingPolicy shippingPolicy;
 
     // Rate limiting tracking per session / client ID
-    private final Map<String, Deque<Long>> rateLimitStore = new ConcurrentHashMap<>();
+    private final Map<String, Deque<Long>> rateLimitStore = new LinkedHashMap<>();
 
     // Bounded conversation memory per session
-    private final Map<String, ChatSessionContext> sessionStore = new ConcurrentHashMap<>();
+    private final Map<String, ChatSessionContext> sessionStore = new LinkedHashMap<>();
 
     // In-memory catalog cache to eliminate loading all products on every chat message
     private volatile List<Product> cachedProducts;
@@ -49,11 +49,13 @@ public class AiChatService {
         this(productRepository, new ShippingPolicy());
     }
 
-    public AiChatResponse processMessage(AiChatRequest request) {
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
+    public synchronized AiChatResponse processMessage(AiChatRequest request) {
         String sessionId = request != null && request.getSessionId() != null && !request.getSessionId().isBlank()
                 ? request.getSessionId().trim()
                 : "anon_" + UUID.randomUUID().toString().substring(0, 8);
 
+        if (sessionId.length() > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Session ID is too long");
         // ── 1. Availability Guardrail: Rate Limiting / Throttling ─────────────────
         if (isRateLimited(sessionId)) {
             return AiChatResponse.builder()
@@ -377,52 +379,52 @@ public class AiChatService {
     // Helper & Logic Methods
     // ─────────────────────────────────────────────────────────────────────────────
 
-    private boolean isRateLimited(String sessionId) {
-        long now = System.currentTimeMillis();
-        Deque<Long> timestamps = rateLimitStore.computeIfAbsent(sessionId, k -> new ConcurrentLinkedDeque<>());
-        synchronized (timestamps) {
-            while (!timestamps.isEmpty() && (now - timestamps.peekFirst()) > RATE_LIMIT_WINDOW_MS) {
-                timestamps.pollFirst();
-            }
-            if (timestamps.size() >= RATE_LIMIT_MAX_REQUESTS) {
-                return true;
-            }
-            timestamps.addLast(now);
-            return false;
-        }
+    public synchronized boolean clientRateLimited(String remoteAddress) {
+        return isRateLimited("client:" + remoteAddress);
     }
 
-    private ChatSessionContext getOrCreateSession(String sessionId) {
+    private synchronized boolean isRateLimited(String key) {
         long now = System.currentTimeMillis();
-        ChatSessionContext context = sessionStore.computeIfAbsent(sessionId, id -> new ChatSessionContext(id, now));
-        context.setLastAccessTime(now);
-
-        // Evict stale sessions if capacity exceeds MAX_SESSIONS
-        if (sessionStore.size() > MAX_SESSIONS) {
-            sessionStore.entrySet().removeIf(e -> (now - e.getValue().getLastAccessTime()) > SESSION_EXPIRY_MS);
-        }
-        return context;
+        rateLimitStore.entrySet().removeIf(e -> e.getValue().isEmpty() || now-e.getValue().peekLast() >= RATE_LIMIT_WINDOW_MS);
+        if (!rateLimitStore.containsKey(key) && rateLimitStore.size() >= MAX_SESSIONS) return true;
+        Deque<Long> timestamps = rateLimitStore.computeIfAbsent(key,k -> new ArrayDeque<>());
+        while (!timestamps.isEmpty() && now-timestamps.peekFirst() >= RATE_LIMIT_WINDOW_MS) timestamps.removeFirst();
+        if (timestamps.size() >= RATE_LIMIT_MAX_REQUESTS) return true;
+        timestamps.addLast(now);
+        return false;
     }
 
-    private List<Product> getCachedActiveProducts() {
+    private synchronized ChatSessionContext getOrCreateSession(String sessionId) {
         long now = System.currentTimeMillis();
-        if (cachedProducts == null || (now - lastCacheTimestamp) > CACHE_TTL_MS) {
-            synchronized (this) {
-                if (cachedProducts == null || (now - lastCacheTimestamp) > CACHE_TTL_MS) {
-                    cachedProducts = productRepository.findAllActiveProductsList();
-                    lastCacheTimestamp = now;
-                }
-            }
+        sessionStore.entrySet().removeIf(e -> now-e.getValue().getLastAccessTime() >= SESSION_EXPIRY_MS);
+        if (!sessionStore.containsKey(sessionId) && sessionStore.size() >= MAX_SESSIONS) sessionStore.remove(sessionStore.keySet().iterator().next());
+        ChatSessionContext result = sessionStore.computeIfAbsent(sessionId,id -> new ChatSessionContext(id,now));
+        result.setLastAccessTime(now);
+        return result;
+    }
+
+    private synchronized List<Product> getCachedActiveProducts() {
+        if (cachedProducts == null || System.currentTimeMillis()-lastCacheTimestamp > CACHE_TTL_MS) {
+            // Only detached, fully initialized values survive the request transaction.
+            cachedProducts = productRepository.findCatalogCandidates("",org.springframework.data.domain.PageRequest.of(0,500)).stream().map(this::snapshot).toList();
+            lastCacheTimestamp = System.currentTimeMillis();
         }
         return cachedProducts;
     }
 
-    public void refreshProductCache() {
-        synchronized (this) {
-            cachedProducts = productRepository.findAllActiveProductsList();
-            lastCacheTimestamp = System.currentTimeMillis();
-        }
+    private Product snapshot(Product p) {
+        var c = p.getCategory();
+        var category = c == null ? null : com.icrowd_api.features.category.Category.builder().id(c.getId()).name(c.getName()).build();
+        return Product.builder().id(p.getId()).sku(p.getSku()).name(p.getName()).description(p.getDescription())
+            .price(p.getPrice()).category(category).availableStock(p.getAvailableStock()).brand(p.getBrand())
+            .warranty(p.getWarranty()).deliveryInfo(p.getDeliveryInfo()).isActive(p.getIsActive())
+            .averageRating(p.getAverageRating()).reviewCount(p.getReviewCount())
+            .imageUrls(p.getImageUrls()==null ? List.of() : List.copyOf(p.getImageUrls()))
+            .tags(p.getTags()==null ? List.of() : List.copyOf(p.getTags()))
+            .features(List.of()).specifications(Map.of()).build();
     }
+
+    public synchronized void refreshProductCache() { cachedProducts = null; lastCacheTimestamp = 0; }
 
     private boolean isLightningIphone15Incompatible(String lower) {
         boolean mentionsLightning = containsWord(lower, "lightning", "ලයිට්නින්ග්", "ලයිට්නින්");

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { useAddressBook } from '../../user/hooks/useAddressBook';
 import MapSelector from '../components/MapSelector';
 import { validateShippingDetails } from '../api/checkoutApi';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../features/cart/hooks/CartContext';
+import { useCart } from '../../features/cart/hooks/cartState';
 
 const BuyNowButton = ({ product, className = '' }) => {
   const navigate = useNavigate();

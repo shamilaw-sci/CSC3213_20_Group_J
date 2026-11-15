@@ -160,7 +160,7 @@ const AdminProducts = () => {
                 {formError && (
                     <div className="mb-4 bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-600">{formError}</div>
                 )}
-                <ProductForm
+                <ProductForm key={editingProduct?.id || "new"}
                     product={editingProduct}
                     categories={categories}
                     onSubmit={handleSubmit}

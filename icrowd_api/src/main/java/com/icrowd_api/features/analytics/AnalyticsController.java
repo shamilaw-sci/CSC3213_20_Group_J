@@ -15,7 +15,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/analytics")
-@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 @RequiredArgsConstructor
 public class AnalyticsController {
 

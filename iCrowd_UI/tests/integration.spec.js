@@ -1,16 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-test('App loads successfully and can hit API', async ({ page }) => {
-  // 1. Navigate to the frontend homepage
-  await page.goto('/');
-
-  // 2. Wait until there are no more active network connections (meaning API calls finished)
-  await page.waitForLoadState('networkidle');
-
-  // 3. Verify the main page title loaded
+test('storefront receives a real successful catalog response', async ({ page, request }) => {
+  const api = await request.get('http://localhost:8080/api/products?size=1');
+  expect(api.status()).toBe(200);
+  expect((await api.json()).content).toBeInstanceOf(Array);
+  const response = page.waitForResponse(res => new URL(res.url()).pathname === '/api/products' && res.request().method() === 'GET');
+  await page.goto('/search');
+  expect((await response).status()).toBe(200);
   await expect(page).toHaveTitle(/iCrowd/);
-  
-  // Note: Since this is a generic smoke test, as long as the page loads 
-  // and reaches networkidle without crashing, it proves the UI booted.
-  // In the future, you can add specific assertions here (e.g. expect(page.getByText('Products')).toBeVisible())
+  await expect(page.getByRole('navigation').first()).toBeVisible();
 });

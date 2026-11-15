@@ -29,10 +29,10 @@ public class AnalyticsService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
-    private final OrderRepository orderRepository;
+    private final AnalyticsFacts factsRepository;
 
     // Cache with short TTL (30 seconds) to avoid redundant DB aggregations on rapid UI clicks
-    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry> cache = new LinkedHashMap<>();
     private static final long CACHE_TTL_MS = 30_000;
 
     private record CacheEntry(AnalyticsSummaryDto data, long timestamp) {}
@@ -70,8 +70,14 @@ public class AnalyticsService {
         return getAnalyticsSummary(range, startDate, endDate, demo, "monthly");
     }
 
-    public AnalyticsSummaryDto getAnalyticsSummary(String range, LocalDate startDate, LocalDate endDate, boolean demo, String grain) {
+    public synchronized AnalyticsSummaryDto getAnalyticsSummary(String range, LocalDate startDate, LocalDate endDate, boolean demo, String grain) {
         String appliedGrain = (grain != null && !grain.isBlank()) ? grain.toLowerCase().trim() : "monthly";
+        range = range==null ? "all" : range.trim().toLowerCase(Locale.ROOT);
+        if (!Set.of("all","today","7d","30d","90d","this_month","last_month","custom").contains(range)) throw new IllegalArgumentException("Unknown date range");
+        if (!Set.of("daily","weekly","monthly").contains(appliedGrain)) throw new IllegalArgumentException("Unknown chart interval");
+        if (startDate!=null || endDate!=null) range="custom";
+        if (startDate!=null && endDate!=null && ChronoUnit.DAYS.between(startDate,endDate)>3660) throw new IllegalArgumentException("Choose a range of at most ten years");
+        cache.entrySet().removeIf(e -> System.currentTimeMillis()-e.getValue().timestamp() >= CACHE_TTL_MS);
         // Cache lookup key
         String cacheKey = String.format("%s_%s_%s_%b_%s", range, startDate, endDate, demo, appliedGrain);
         CacheEntry cached = cache.get(cacheKey);
@@ -80,6 +86,7 @@ public class AnalyticsService {
         }
 
         AnalyticsSummaryDto summary = computeAnalyticsSummary(range, startDate, endDate, demo, appliedGrain);
+        if (cache.size() >= 64) cache.remove(cache.keySet().iterator().next());
         cache.put(cacheKey, new CacheEntry(summary, System.currentTimeMillis()));
         return summary;
     }
@@ -155,18 +162,10 @@ public class AnalyticsService {
         List<Product> products = productRepository.findAllActiveProductsList();
         List<Category> categories = categoryRepository.findAll();
 
-        // Optimized repository query using JOIN FETCH and SQL filtering by status & date
-        List<Order> rawOrders;
-        if (startDateTime != null) {
-            rawOrders = orderRepository.findQualifyingOrdersBetween(startDateTime, endDateTime, QUALIFYING_ORDER_STATUSES);
-        } else {
-            rawOrders = orderRepository.findAllQualifyingOrders(QUALIFYING_ORDER_STATUSES);
-        }
-
-        // Apply strict qualifying order and payment filter
-        List<Order> qualifyingOrders = rawOrders.stream()
-                .filter(this::isQualifyingOrder)
-                .collect(Collectors.toList());
+        // All-time totals cover all orders; chart/forecast samples use the latest two years.
+        LocalDateTime chartStart = startDateTime==null ? now.minusYears(2).withDayOfMonth(1).toLocalDate().atStartOfDay() : startDateTime;
+        var facts = factsRepository.read(startDateTime,endDateTime,chartStart,"today".equals(appliedRange));
+        int qualifyingOrderCount = facts.orderCount();
 
         // ── 3. Live Inventory Metrics ────────────────────────────────────────────────
         BigDecimal inventoryValuation = BigDecimal.ZERO;
@@ -200,7 +199,7 @@ public class AnalyticsService {
         int totalUnitsSold = 0;
         BigDecimal totalRevenue = BigDecimal.ZERO;
         BigDecimal totalCost = BigDecimal.ZERO; // Cost of Goods Sold (purchase-time cost)
-        BigDecimal totalDiscounts = BigDecimal.ZERO;
+        BigDecimal totalDiscounts = facts.discounts();
 
         Map<String, Integer> categoryUnitsSold = new HashMap<>();
         Map<String, BigDecimal> categoryRevenueMap = new HashMap<>();
@@ -216,47 +215,20 @@ public class AnalyticsService {
         Map<LocalDate, BigDecimal> dailyCostMap = new TreeMap<>();
         Map<String, Map<LocalDate, Integer>> categoryDailyUnits = new HashMap<>();
 
-        for (Order o : qualifyingOrders) {
-            if (o.getDiscountAmount() != null) {
-                totalDiscounts = totalDiscounts.add(o.getDiscountAmount());
-            }
-
-            LocalDate orderDate = o.getCreatedAt() != null ? o.getCreatedAt().toLocalDate() : LocalDate.now();
-
-            if (o.getItems() != null) {
-                for (OrderItem item : o.getItems()) {
-                    int qty = item.getQuantity() != null ? item.getQuantity() : 0;
-                    BigDecimal price = item.getPriceAtTimeOfPurchase() != null ? item.getPriceAtTimeOfPurchase() : BigDecimal.ZERO;
-                    BigDecimal cost = item.getEffectiveCostPrice();
-                    BigDecimal lineRev = price.multiply(BigDecimal.valueOf(qty));
-                    BigDecimal lineCost = cost.multiply(BigDecimal.valueOf(qty));
-
-                    totalUnitsSold += qty;
-                    totalRevenue = totalRevenue.add(lineRev);
-                    totalCost = totalCost.add(lineCost);
-
-                    dailyUnitsSold.merge(orderDate, qty, Integer::sum);
-                    dailyRevenueMap.merge(orderDate, lineRev, BigDecimal::add);
-                    dailyCostMap.merge(orderDate, lineCost, BigDecimal::add);
-
-                    if (item.getProduct() != null) {
-                        Long pid = item.getProduct().getId();
-                        String catName = item.getProduct().getCategory() != null ? item.getProduct().getCategory().getName() : "General";
-
-                        categoryUnitsSold.merge(catName, qty, Integer::sum);
-                        categoryRevenueMap.merge(catName, lineRev, BigDecimal::add);
-                        categoryCostMap.merge(catName, lineCost, BigDecimal::add);
-
-                        categoryDailyUnits.computeIfAbsent(catName, k -> new TreeMap<>())
-                                .merge(orderDate, qty, Integer::sum);
-
-                        productUnitsSold.merge(pid, qty, Integer::sum);
-                        productRevenueMap.merge(pid, lineRev, BigDecimal::add);
-                        productCostMap.merge(pid, lineCost, BigDecimal::add);
-                    }
-                }
-            }
+        for (var row : facts.products()) {
+            totalUnitsSold += row.units(); totalRevenue=totalRevenue.add(row.revenue()); totalCost=totalCost.add(row.cost());
+            categoryUnitsSold.merge(row.category(),row.units(),Integer::sum);
+            categoryRevenueMap.merge(row.category(),row.revenue(),BigDecimal::add);
+            categoryCostMap.merge(row.category(),row.cost(),BigDecimal::add);
+            productUnitsSold.put(row.id(),row.units()); productRevenueMap.put(row.id(),row.revenue()); productCostMap.put(row.id(),row.cost());
         }
+        for (var row : facts.periods()) {
+            LocalDate date=row.time().toLocalDate();
+            dailyUnitsSold.merge(date,row.units(),Integer::sum); dailyRevenueMap.merge(date,row.revenue(),BigDecimal::add); dailyCostMap.merge(date,row.cost(),BigDecimal::add);
+            categoryDailyUnits.computeIfAbsent(row.category(),key -> new TreeMap<>()).merge(date,row.units(),Integer::sum);
+        }
+        for (LocalDate date=chartStart.toLocalDate(); !date.isAfter(endDateTime.toLocalDate()); date=date.plusDays(1)) dailyUnitsSold.putIfAbsent(date,0);
+        boolean estimatedCosts=facts.products().stream().anyMatch(row -> row.estimatedUnits()>0) || products.stream().anyMatch(p -> p.getCostPrice()==null);
 
         // ── 5. Demo Mode Handling ────────────────────────────────────────────────────
         // Only if demo mode is explicitly requested, generate simulated realistic demo figures.
@@ -276,7 +248,9 @@ public class AnalyticsService {
 
             dataSourceDescription = "DEMO MODE - Simulated Sample Data (Not Production Database)";
         } else {
-            dataSourceDescription = String.format("Live Production Database (%d qualifying orders analyzed)", qualifyingOrders.size());
+            dataSourceDescription = String.format("Live Production Database (%d qualifying orders analyzed)", qualifyingOrderCount)
+                + (estimatedCosts ? ". Cost/profit estimates include missing costs assumed at 60% of purchase price; enter verified purchase costs." : ". Costs use recorded purchase prices.")
+                + (startDateTime==null ? " All-time totals; charts and validation show the latest two years." : "");
         }
 
         // ── 6. Documented Gross & Net Profit Measures ────────────────────────────────
@@ -303,24 +277,17 @@ public class AnalyticsService {
                 .orElse(categories.isEmpty() ? "None" : categories.get(0).getName());
 
         // ── 7. Prediction & Forecasting Baseline (Steps 1-6) ─────────────────────────
-        long horizonDays = calculateHorizonDays(appliedRange, startDate, endDate, qualifyingOrders);
-        double dailyRunRate = horizonDays > 0 ? (double) totalUnitsSold / horizonDays : 0.0;
-        BigDecimal predictedNextMonthRevenue = totalRevenue.compareTo(BigDecimal.ZERO) > 0
-                ? BigDecimal.valueOf(dailyRunRate * 30 * (totalRevenue.doubleValue() / Math.max(1, totalUnitsSold))).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-
-        // Dynamic Sales Forecast Chart Data from dated transactions
-        List<AnalyticsSummaryDto.SalesForecastDto> salesForecast = generateSalesForecastFromTransactions(
-                appliedRange, qualifyingOrders, dailyUnitsSold, isDemoActive, horizonDays, grain
-        );
-
-        // Model accuracy & validation metrics (Holdout MAE / WAPE / Bias)
-        AnalyticsSummaryDto.ForecastMetricsDto forecastMetrics = evaluateForecastAccuracy(dailyUnitsSold, isDemoActive);
-
-        // Profit Analysis Chart from dated transactions
-        List<AnalyticsSummaryDto.ProfitAnalysisDto> profitAnalysis = generateProfitAnalysisFromTransactions(
-                appliedRange, qualifyingOrders, dailyRevenueMap, dailyCostMap, isDemoActive, totalRevenue, totalCost
-        );
+        long horizonDays=Math.max(1,ChronoUnit.DAYS.between(startDateTime==null ? facts.firstSale() : startDateTime.toLocalDate(),endDateTime.toLocalDate())+1);
+        double dailyRunRate=(double)totalUnitsSold/horizonDays;
+        BigDecimal predictedNextMonthRevenue=totalUnitsSold==0 ? BigDecimal.ZERO : BigDecimal.valueOf(dailyRunRate*30*totalRevenue.doubleValue()/totalUnitsSold).setScale(2,RoundingMode.HALF_UP);
+        var buckets = chartBuckets(chartStart,endDateTime,appliedRange,grain,facts.periods());
+        List<AnalyticsSummaryDto.SalesForecastDto> salesForecast = isDemoActive ? generateDemoSalesForecast(appliedRange) : buckets.stream().map(b -> AnalyticsSummaryDto.SalesForecastDto.builder().name(b.label()).sales(b.units()).predicted(null).isHistorical(true).build()).collect(Collectors.toCollection(ArrayList::new));
+        if (!isDemoActive && !buckets.isEmpty()) {
+            int prediction=(int)Math.round(buckets.stream().skip(Math.max(0,buckets.size()-7)).mapToInt(Bucket::units).average().orElse(0));
+            salesForecast.add(AnalyticsSummaryDto.SalesForecastDto.builder().name("Next interval (estimate)").sales(null).predicted(prediction).isHistorical(false).build());
+        }
+        var forecastMetrics=evaluateForecastAccuracy(dailyUnitsSold,isDemoActive);
+        List<AnalyticsSummaryDto.ProfitAnalysisDto> profitAnalysis=isDemoActive ? generateDemoProfitAnalysis(appliedRange,totalRevenue,totalCost) : buckets.stream().map(b -> AnalyticsSummaryDto.ProfitAnalysisDto.builder().month(b.label()).revenue(b.revenue()).cost(b.cost()).profit(b.revenue().subtract(b.cost())).build()).toList();
 
         // Category Distribution Chart
         int sumCategoryUnits = categoryUnitsSold.values().stream().mapToInt(v -> v != null ? v : 0).sum();
@@ -416,7 +383,7 @@ public class AnalyticsService {
         // ── 9. Strategic Opportunity Insights (Generated from Real Data) ──────────────
         AnalyticsSummaryDto.OpportunityInsightsDto opportunityInsights = generateOpportunityInsights(
                 dateRangeLabel, topCategory, categoryRevenueMap, categoryCostMap, lowStockCount,
-                qualifyingOrders.size(), totalUnitsSold, grossProfit, profitMargin, dataSourceDescription
+                qualifyingOrderCount, totalUnitsSold, grossProfit, profitMargin, dataSourceDescription
         );
 
         String aiRecommendation = String.format(
@@ -445,7 +412,7 @@ public class AnalyticsService {
                 .collect(Collectors.toList());
 
         // ── 11. Customer Purchase Analytics (RFM / CLV / AOV) ────────────────────────
-        AnalyticsSummaryDto.CustomerAnalyticsDto customerAnalytics = calculateCustomerAnalytics(qualifyingOrders, totalRevenue);
+        AnalyticsSummaryDto.CustomerAnalyticsDto customerAnalytics = facts.customers();
 
         // ── 12. Worst Performing & Dead Stock SKUs ───────────────────────────────────
         List<AnalyticsSummaryDto.WorstProductDto> worstProducts = calculateWorstProducts(products, productUnitsSold, productRevenueMap);
@@ -463,12 +430,13 @@ public class AnalyticsService {
         AnalyticsSummaryDto.OverviewDto overview = AnalyticsSummaryDto.OverviewDto.builder()
                 .totalRevenue(totalRevenue)
                 .totalCost(totalCost)
+                .costsEstimated(estimatedCosts)
                 .grossProfit(grossProfit)
                 .netProfit(netProfit)
                 .totalProfit(grossProfit)
                 .profitMargin(Math.round(profitMargin * 10.0) / 10.0)
                 .totalUnitsSold(totalUnitsSold)
-                .qualifyingOrderCount(qualifyingOrders.size())
+                .qualifyingOrderCount(qualifyingOrderCount)
                 .inventoryValuation(inventoryValuation.setScale(2, RoundingMode.HALF_UP))
                 .predictedNextMonthRevenue(predictedNextMonthRevenue)
                 .lowStockCount(lowStockCount)
@@ -501,26 +469,6 @@ public class AnalyticsService {
                 .build();
     }
 
-    /**
-     * Determines whether an order qualifies as a valid, confirmed business transaction.
-     */
-    private boolean isQualifyingOrder(Order o) {
-        if (o == null) return false;
-        if (!QUALIFYING_ORDER_STATUSES.contains(o.getStatus())) return false;
-        if (o.getStatus() == OrderStatus.CANCELLED ||
-            o.getStatus() == OrderStatus.FAILED ||
-            o.getStatus() == OrderStatus.STOCK_UNAVAILABLE ||
-            o.getStatus() == OrderStatus.REFUNDED) {
-            return false;
-        }
-        if (o.getPaymentStatus() == PaymentStatus.FAILED ||
-            o.getPaymentStatus() == PaymentStatus.CANCELLED ||
-            o.getPaymentStatus() == PaymentStatus.REFUNDED) {
-            return false;
-        }
-        return QUALIFYING_PAYMENT_STATUSES.contains(o.getPaymentStatus());
-    }
-
     private double getTimeScale(String range, LocalDate startDate, LocalDate endDate) {
         return switch (range) {
             case "today" -> 1.0 / 180.0;
@@ -534,26 +482,6 @@ public class AnalyticsService {
                 yield Math.min(1.0, Math.max(0.01, days / 180.0));
             }
             default -> 1.0;
-        };
-    }
-
-    private long calculateHorizonDays(String range, LocalDate start, LocalDate end, List<Order> qualifyingOrders) {
-        if (start != null && end != null) {
-            return Math.max(1, ChronoUnit.DAYS.between(start, end) + 1);
-        }
-        return switch (range) {
-            case "today" -> 1;
-            case "7d" -> 7;
-            case "30d", "this_month", "last_month" -> 30;
-            case "90d" -> 90;
-            default -> {
-                if (qualifyingOrders.isEmpty()) yield 30;
-                LocalDate earliest = qualifyingOrders.stream()
-                        .map(o -> o.getCreatedAt() != null ? o.getCreatedAt().toLocalDate() : LocalDate.now())
-                        .min(LocalDate::compareTo)
-                        .orElse(LocalDate.now().minusDays(30));
-                yield Math.max(1, ChronoUnit.DAYS.between(earliest, LocalDate.now()) + 1);
-            }
         };
     }
 
@@ -572,17 +500,17 @@ public class AnalyticsService {
     private AnalyticsSummaryDto.ForecastMetricsDto evaluateForecastAccuracy(Map<LocalDate, Integer> dailyUnits, boolean isDemo) {
         if (isDemo && dailyUnits.size() < 14) {
             return AnalyticsSummaryDto.ForecastMetricsDto.builder()
-                    .modelName("7-Day Moving Average Baseline")
+                    .modelName("Training-mean baseline")
                     .mae(1.25)
                     .wape(8.5)
                     .forecastBias(1.1)
                     .forecastDate(LocalDate.now().toString())
                     .dataSufficiency("SUFFICIENT")
-                    .validationMethod("Calibrated on benchmark simulated historical sales")
+                    .validationMethod("Illustrative sample metrics; not measured accuracy")
                     .build();
         }
 
-        if (dailyUnits.size() >= 14) {
+        if (dailyUnits.size() >= 14 && dailyUnits.values().stream().anyMatch(units -> units > 0)) {
             // Split into train (first 70%) and test (last 30%)
             List<Map.Entry<LocalDate, Integer>> entries = new ArrayList<>(dailyUnits.entrySet());
             int splitIdx = (int) Math.floor(entries.size() * 0.7);
@@ -591,7 +519,7 @@ public class AnalyticsService {
             double trainMean = entries.subList(0, splitIdx).stream()
                     .mapToInt(Map.Entry::getValue)
                     .average()
-                    .orElse(10.0);
+                    .orElse(0.0);
 
             double sumAbsError = 0.0;
             double sumActual = 0.0;
@@ -607,23 +535,23 @@ public class AnalyticsService {
                 testCount++;
             }
 
-            double mae = testCount > 0 ? Math.round((sumAbsError / testCount) * 100.0) / 100.0 : 1.25;
-            double wape = sumActual > 0 ? Math.round((sumAbsError / sumActual) * 1000.0) / 10.0 : 8.5;
-            double bias = sumActual > 0 ? Math.round((sumError / sumActual) * 1000.0) / 10.0 : 1.1;
+            Double mae = testCount > 0 ? Math.round((sumAbsError / testCount) * 100.0) / 100.0 : null;
+            Double wape = sumActual > 0 ? Math.round((sumAbsError / sumActual) * 1000.0) / 10.0 : null;
+            Double bias = sumActual > 0 ? Math.round((sumError / sumActual) * 1000.0) / 10.0 : null;
 
             return AnalyticsSummaryDto.ForecastMetricsDto.builder()
-                    .modelName("7-Day Moving Average Baseline")
+                    .modelName("Training-mean baseline")
                     .mae(mae)
                     .wape(wape)
                     .forecastBias(bias)
                     .forecastDate(LocalDate.now().toString())
-                    .dataSufficiency("SUFFICIENT")
-                    .validationMethod("Held-out 30% Historical Window Backtesting")
+                    .dataSufficiency(sumActual > 0 ? "SUFFICIENT" : "INSUFFICIENT_DATA")
+                    .validationMethod("Held-out 30% historical window; percentage metrics require holdout sales")
                     .build();
         }
 
         return AnalyticsSummaryDto.ForecastMetricsDto.builder()
-                .modelName("7-Day Moving Average Baseline")
+                .modelName("Training-mean baseline")
                 .mae(null)
                 .wape(null)
                 .forecastBias(null)
@@ -633,270 +561,24 @@ public class AnalyticsService {
                 .build();
     }
 
-    /**
-     * Dynamic sales forecast buckets generated from actual dated transactions.
-     */
-    private List<AnalyticsSummaryDto.SalesForecastDto> generateSalesForecastFromTransactions(
-            String range, List<Order> qualifyingOrders, Map<LocalDate, Integer> dailyUnits,
-            boolean isDemo, long horizonDays, String grain) {
-
-        if ("daily".equalsIgnoreCase(grain)) {
-            List<AnalyticsSummaryDto.SalesForecastDto> list = new ArrayList<>();
-            LocalDate start = LocalDate.now().minusDays(13);
-            for (int i = 0; i < 14; i++) {
-                LocalDate d = start.plusDays(i);
-                int actual = dailyUnits.getOrDefault(d, 0);
-                int predicted = isDemo ? (actual > 0 ? actual : (i % 3 == 0 ? 4 : 2)) : Math.max(actual, (int) Math.round(actual * 1.05));
-                list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                        .name(d.format(DateTimeFormatter.ofPattern("dd MMM")))
-                        .sales(actual)
-                        .predicted(predicted)
-                        .lowerBound(Math.max(0, predicted - 2))
-                        .upperBound(predicted + 2)
-                        .isHistorical(true)
-                        .build());
-            }
-            return list;
+    private record Bucket(String label,int units,BigDecimal revenue,BigDecimal cost) {}
+    private List<Bucket> chartBuckets(LocalDateTime start, LocalDateTime end, String range, String grain, List<AnalyticsFacts.PeriodSales> rows) {
+        java.util.function.Function<LocalDateTime,LocalDateTime> key = t -> {
+            if ("today".equals(range)) return t.withMinute(0).withSecond(0).withNano(0);
+            LocalDate d=t.toLocalDate();
+            if ("weekly".equals(grain)) d=d.minusDays(d.getDayOfWeek().getValue()-1);
+            if ("monthly".equals(grain)) d=d.withDayOfMonth(1);
+            return d.atStartOfDay();
+        };
+        Map<LocalDateTime,Bucket> result=new TreeMap<>();
+        java.util.function.UnaryOperator<LocalDateTime> next=t -> "today".equals(range) ? t.plusHours(1) : "daily".equals(grain) ? t.plusDays(1) : "weekly".equals(grain) ? t.plusWeeks(1) : t.plusMonths(1);
+        DateTimeFormatter format=DateTimeFormatter.ofPattern("today".equals(range) ? "HH:mm" : "monthly".equals(grain) ? "MMM yyyy" : "dd MMM yyyy");
+        for (LocalDateTime t=key.apply(start);!t.isAfter(end);t=next.apply(t)) result.put(t,new Bucket(t.format(format),0,BigDecimal.ZERO,BigDecimal.ZERO));
+        for (var row : rows) {
+            var t=key.apply(row.time()); var previous=result.get(t);
+            if (previous!=null) result.put(t,new Bucket(previous.label(),previous.units()+row.units(),previous.revenue().add(row.revenue()),previous.cost().add(row.cost())));
         }
-
-        if ("weekly".equalsIgnoreCase(grain)) {
-            List<AnalyticsSummaryDto.SalesForecastDto> list = new ArrayList<>();
-            LocalDate start = LocalDate.now().minusWeeks(5);
-            for (int w = 0; w < 6; w++) {
-                LocalDate wStart = start.plusWeeks(w);
-                LocalDate wEnd = wStart.plusDays(6);
-                int weekUnits = 0;
-                for (Map.Entry<LocalDate, Integer> e : dailyUnits.entrySet()) {
-                    if (!e.getKey().isBefore(wStart) && !e.getKey().isAfter(wEnd)) {
-                        weekUnits += e.getValue();
-                    }
-                }
-                int predicted = isDemo ? (weekUnits > 0 ? weekUnits : 12 + w * 2) : Math.max(weekUnits, (int) Math.round(weekUnits * 1.05));
-                list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                        .name("Wk " + (w + 1) + " (" + wStart.format(DateTimeFormatter.ofPattern("MM/dd")) + ")")
-                        .sales(weekUnits)
-                        .predicted(predicted)
-                        .lowerBound(Math.max(0, predicted - 4))
-                        .upperBound(predicted + 4)
-                        .isHistorical(true)
-                        .build());
-            }
-            return list;
-        }
-
-        if (isDemo) {
-            return generateDemoSalesForecast(range);
-        }
-
-        List<AnalyticsSummaryDto.SalesForecastDto> list = new ArrayList<>();
-
-        if ("today".equals(range)) {
-            // Hourly breakdown of today's qualifying transactions
-            int[] hours = {8, 11, 14, 17, 20, 23};
-            for (int h : hours) {
-                int count = 0;
-                for (Order o : qualifyingOrders) {
-                    if (o.getCreatedAt() != null && o.getCreatedAt().getHour() == h) {
-                        count += o.getItems() != null ? o.getItems().stream().mapToInt(OrderItem::getQuantity).sum() : 0;
-                    }
-                }
-                int predicted = Math.max(count, (int) Math.round(count * 1.05));
-                list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                        .name(String.format("%02d:00", h))
-                        .sales(count)
-                        .predicted(predicted)
-                        .lowerBound(Math.max(0, predicted - 2))
-                        .upperBound(predicted + 2)
-                        .isHistorical(true)
-                        .build());
-            }
-            return list;
-        }
-
-        if ("7d".equals(range)) {
-            // Last 7 days bucketed by day of week
-            LocalDate start = LocalDate.now().minusDays(6);
-            for (int i = 0; i < 7; i++) {
-                LocalDate d = start.plusDays(i);
-                int actual = dailyUnits.getOrDefault(d, 0);
-                int predicted = Math.max(actual, (int) Math.round(actual * 1.05));
-                list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                        .name(d.format(DateTimeFormatter.ofPattern("EEE")))
-                        .sales(actual)
-                        .predicted(predicted)
-                        .lowerBound(Math.max(0, predicted - 3))
-                        .upperBound(predicted + 3)
-                        .isHistorical(true)
-                        .build());
-            }
-            return list;
-        }
-
-        if ("30d".equals(range) || "this_month".equals(range) || "last_month".equals(range)) {
-            // Bucketed by week (4 weeks)
-            LocalDate start = "last_month".equals(range)
-                    ? LocalDate.now().minusMonths(1).withDayOfMonth(1)
-                    : LocalDate.now().minusDays(27);
-
-            for (int w = 1; w <= 4; w++) {
-                LocalDate wStart = start.plusDays((w - 1) * 7L);
-                LocalDate wEnd = wStart.plusDays(6);
-                int weekUnits = 0;
-                for (Map.Entry<LocalDate, Integer> e : dailyUnits.entrySet()) {
-                    if (!e.getKey().isBefore(wStart) && !e.getKey().isAfter(wEnd)) {
-                        weekUnits += e.getValue();
-                    }
-                }
-                int predicted = Math.max(weekUnits, (int) Math.round(weekUnits * 1.05));
-                list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                        .name("Week " + w)
-                        .sales(weekUnits)
-                        .predicted(predicted)
-                        .lowerBound(Math.max(0, predicted - 5))
-                        .upperBound(predicted + 5)
-                        .isHistorical(true)
-                        .build());
-            }
-            return list;
-        }
-
-        // Default / All Time: Monthly buckets
-        Map<String, Integer> monthlyUnits = new LinkedHashMap<>();
-        for (int m = 5; m >= 0; m--) {
-            LocalDate mDate = LocalDate.now().minusMonths(m);
-            String mKey = mDate.format(DateTimeFormatter.ofPattern("MMM"));
-            monthlyUnits.put(mKey, 0);
-        }
-
-        for (Map.Entry<LocalDate, Integer> e : dailyUnits.entrySet()) {
-            String mKey = e.getKey().format(DateTimeFormatter.ofPattern("MMM"));
-            if (monthlyUnits.containsKey(mKey)) {
-                monthlyUnits.put(mKey, monthlyUnits.get(mKey) + e.getValue());
-            }
-        }
-
-        monthlyUnits.forEach((mName, units) -> {
-            int predicted = Math.max(units, (int) Math.round(units * 1.08));
-            list.add(AnalyticsSummaryDto.SalesForecastDto.builder()
-                    .name(mName)
-                    .sales(units)
-                    .predicted(predicted)
-                    .lowerBound(Math.max(0, predicted - 8))
-                    .upperBound(predicted + 8)
-                    .isHistorical(true)
-                    .build());
-        });
-
-        return list;
-    }
-
-    /**
-     * Dynamic profit analysis buckets generated from actual dated transactions.
-     */
-    private List<AnalyticsSummaryDto.ProfitAnalysisDto> generateProfitAnalysisFromTransactions(
-            String range, List<Order> qualifyingOrders, Map<LocalDate, BigDecimal> dailyRevenue,
-            Map<LocalDate, BigDecimal> dailyCost, boolean isDemo, BigDecimal totalRev, BigDecimal totalCost) {
-
-        if (isDemo) {
-            return generateDemoProfitAnalysis(range, totalRev, totalCost);
-        }
-
-        List<AnalyticsSummaryDto.ProfitAnalysisDto> list = new ArrayList<>();
-
-        if ("today".equals(range)) {
-            BigDecimal rev = totalRev;
-            BigDecimal cost = totalCost;
-            BigDecimal profit = rev.subtract(cost);
-            return List.of(
-                    AnalyticsSummaryDto.ProfitAnalysisDto.builder().month("Morning").revenue(rev.multiply(BigDecimal.valueOf(0.35)).setScale(2, RoundingMode.HALF_UP)).cost(cost.multiply(BigDecimal.valueOf(0.35)).setScale(2, RoundingMode.HALF_UP)).profit(profit.multiply(BigDecimal.valueOf(0.35)).setScale(2, RoundingMode.HALF_UP)).build(),
-                    AnalyticsSummaryDto.ProfitAnalysisDto.builder().month("Afternoon").revenue(rev.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP)).cost(cost.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP)).profit(profit.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP)).build(),
-                    AnalyticsSummaryDto.ProfitAnalysisDto.builder().month("Evening").revenue(rev.multiply(BigDecimal.valueOf(0.25)).setScale(2, RoundingMode.HALF_UP)).cost(cost.multiply(BigDecimal.valueOf(0.25)).setScale(2, RoundingMode.HALF_UP)).profit(profit.multiply(BigDecimal.valueOf(0.25)).setScale(2, RoundingMode.HALF_UP)).build()
-            );
-        }
-
-        if ("7d".equals(range)) {
-            LocalDate start = LocalDate.now().minusDays(6);
-            for (int i = 0; i < 7; i++) {
-                LocalDate d = start.plusDays(i);
-                BigDecimal rev = dailyRevenue.getOrDefault(d, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal c = dailyCost.getOrDefault(d, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal p = rev.subtract(c);
-                list.add(AnalyticsSummaryDto.ProfitAnalysisDto.builder()
-                        .month(d.format(DateTimeFormatter.ofPattern("EEE")))
-                        .revenue(rev)
-                        .cost(c)
-                        .profit(p)
-                        .build());
-            }
-            return list;
-        }
-
-        if ("30d".equals(range) || "this_month".equals(range) || "last_month".equals(range)) {
-            LocalDate start = "last_month".equals(range)
-                    ? LocalDate.now().minusMonths(1).withDayOfMonth(1)
-                    : LocalDate.now().minusDays(27);
-
-            for (int w = 1; w <= 4; w++) {
-                LocalDate wStart = start.plusDays((w - 1) * 7L);
-                LocalDate wEnd = wStart.plusDays(6);
-                BigDecimal wRev = BigDecimal.ZERO;
-                BigDecimal wCost = BigDecimal.ZERO;
-
-                for (Map.Entry<LocalDate, BigDecimal> e : dailyRevenue.entrySet()) {
-                    if (!e.getKey().isBefore(wStart) && !e.getKey().isAfter(wEnd)) {
-                        wRev = wRev.add(e.getValue());
-                    }
-                }
-                for (Map.Entry<LocalDate, BigDecimal> e : dailyCost.entrySet()) {
-                    if (!e.getKey().isBefore(wStart) && !e.getKey().isAfter(wEnd)) {
-                        wCost = wCost.add(e.getValue());
-                    }
-                }
-
-                list.add(AnalyticsSummaryDto.ProfitAnalysisDto.builder()
-                        .month("Week " + w)
-                        .revenue(wRev.setScale(2, RoundingMode.HALF_UP))
-                        .cost(wCost.setScale(2, RoundingMode.HALF_UP))
-                        .profit(wRev.subtract(wCost).setScale(2, RoundingMode.HALF_UP))
-                        .build());
-            }
-            return list;
-        }
-
-        // Monthly breakdown
-        Map<String, BigDecimal> mRev = new LinkedHashMap<>();
-        Map<String, BigDecimal> mCost = new LinkedHashMap<>();
-        for (int m = 5; m >= 0; m--) {
-            String mKey = LocalDate.now().minusMonths(m).format(DateTimeFormatter.ofPattern("MMM"));
-            mRev.put(mKey, BigDecimal.ZERO);
-            mCost.put(mKey, BigDecimal.ZERO);
-        }
-
-        for (Map.Entry<LocalDate, BigDecimal> e : dailyRevenue.entrySet()) {
-            String mKey = e.getKey().format(DateTimeFormatter.ofPattern("MMM"));
-            if (mRev.containsKey(mKey)) {
-                mRev.put(mKey, mRev.get(mKey).add(e.getValue()));
-            }
-        }
-        for (Map.Entry<LocalDate, BigDecimal> e : dailyCost.entrySet()) {
-            String mKey = e.getKey().format(DateTimeFormatter.ofPattern("MMM"));
-            if (mCost.containsKey(mKey)) {
-                mCost.put(mKey, mCost.get(mKey).add(e.getValue()));
-            }
-        }
-
-        mRev.forEach((mName, rev) -> {
-            BigDecimal c = mCost.getOrDefault(mName, BigDecimal.ZERO);
-            BigDecimal p = rev.subtract(c);
-            list.add(AnalyticsSummaryDto.ProfitAnalysisDto.builder()
-                    .month(mName)
-                    .revenue(rev.setScale(2, RoundingMode.HALF_UP))
-                    .cost(c.setScale(2, RoundingMode.HALF_UP))
-                    .profit(p.setScale(2, RoundingMode.HALF_UP))
-                    .build());
-        });
-
-        return list;
+        return new ArrayList<>(result.values());
     }
 
     private AnalyticsSummaryDto.OpportunityInsightsDto generateOpportunityInsights(
@@ -1014,68 +696,6 @@ public class AnalyticsService {
                 AnalyticsSummaryDto.ProfitAnalysisDto.builder().month("May").revenue(BigDecimal.valueOf(49500)).cost(BigDecimal.valueOf(27225)).profit(BigDecimal.valueOf(22275)).build(),
                 AnalyticsSummaryDto.ProfitAnalysisDto.builder().month("Jun").revenue(BigDecimal.valueOf(43000)).cost(BigDecimal.valueOf(23650)).profit(BigDecimal.valueOf(19350)).build()
         );
-    }
-
-    private AnalyticsSummaryDto.CustomerAnalyticsDto calculateCustomerAnalytics(List<Order> qualifyingOrders, BigDecimal totalRevenue) {
-        if (qualifyingOrders == null || qualifyingOrders.isEmpty()) {
-            return AnalyticsSummaryDto.CustomerAnalyticsDto.builder()
-                    .totalCustomers(0)
-                    .repeatCustomerCount(0)
-                    .repeatPurchaseRate(0.0)
-                    .averageOrderValue(BigDecimal.ZERO)
-                    .customerLifetimeValue(BigDecimal.ZERO)
-                    .topCustomers(List.of())
-                    .build();
-        }
-
-        Map<String, List<Order>> customerOrders = new HashMap<>();
-        for (Order o : qualifyingOrders) {
-            String key = o.getUser() != null ? String.valueOf(o.getUser().getId()) : (o.getShippingEmail() != null ? o.getShippingEmail() : "guest");
-            customerOrders.computeIfAbsent(key, k -> new ArrayList<>()).add(o);
-        }
-
-        int totalCustomers = customerOrders.size();
-        long repeatCount = customerOrders.values().stream().filter(list -> list.size() >= 2).count();
-        double repeatRate = totalCustomers > 0 ? ((double) repeatCount / totalCustomers) * 100.0 : 0.0;
-
-        BigDecimal aov = totalRevenue.divide(BigDecimal.valueOf(qualifyingOrders.size()), 2, RoundingMode.HALF_UP);
-        double avgOrdersPerCustomer = (double) qualifyingOrders.size() / Math.max(1, totalCustomers);
-        BigDecimal clv = aov.multiply(BigDecimal.valueOf(avgOrdersPerCustomer)).setScale(2, RoundingMode.HALF_UP);
-
-        List<AnalyticsSummaryDto.TopCustomerDto> topCustomers = customerOrders.entrySet().stream()
-                .map(entry -> {
-                    List<Order> orders = entry.getValue();
-                    Order sample = orders.get(0);
-                    String name = sample.getShippingFullName() != null ? sample.getShippingFullName() : "Customer " + entry.getKey();
-                    String email = sample.getShippingEmail() != null ? sample.getShippingEmail() : "customer@example.com";
-                    BigDecimal spent = orders.stream()
-                            .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    LocalDate lastDate = orders.stream()
-                            .map(o -> o.getCreatedAt() != null ? o.getCreatedAt().toLocalDate() : LocalDate.now())
-                            .max(LocalDate::compareTo)
-                            .orElse(LocalDate.now());
-
-                    return AnalyticsSummaryDto.TopCustomerDto.builder()
-                            .name(name)
-                            .email(email)
-                            .orderCount(orders.size())
-                            .totalSpent(spent)
-                            .lastOrderDate(lastDate.toString())
-                            .build();
-                })
-                .sorted((c1, c2) -> c2.getTotalSpent().compareTo(c1.getTotalSpent()))
-                .limit(5)
-                .collect(Collectors.toList());
-
-        return AnalyticsSummaryDto.CustomerAnalyticsDto.builder()
-                .totalCustomers(totalCustomers)
-                .repeatCustomerCount((int) repeatCount)
-                .repeatPurchaseRate(Math.round(repeatRate * 10.0) / 10.0)
-                .averageOrderValue(aov)
-                .customerLifetimeValue(clv)
-                .topCustomers(topCustomers)
-                .build();
     }
 
     private List<AnalyticsSummaryDto.WorstProductDto> calculateWorstProducts(

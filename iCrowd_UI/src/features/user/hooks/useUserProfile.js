@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useEffectEvent } from 'react';
 import { fetchUserProfile, updateUserProfile } from '../api/userApi';
 import { useAuth } from '../../auth/hooks/useAuth';
 
@@ -67,8 +67,9 @@ export const useUserProfile = () => {
         }
     };
 
+    const initialLoad = useEffectEvent(() => loadProfile());
     useEffect(() => {
-        loadProfile();
+        initialLoad();
     }, []);
 
     const handleChange = (e) => {

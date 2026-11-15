@@ -20,15 +20,20 @@ public class StorefrontController {
     }
     @GetMapping("/api/storefront/hero")
     @Transactional(readOnly = true)
-    public HeroView get() { return view(repository.findById(1L).orElseGet(StorefrontHero::new)); }
+    public HeroView get() { return repository.metadata().map(h -> new HeroView(h.getHeadline(),h.getSubtitle(),h.getImageVersion()==null ? null : "/storefront/hero/image?v="+h.getImageVersion())).orElseGet(() -> view(new StorefrontHero())); }
 
     @GetMapping("/api/storefront/hero/image")
     @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> image() {
+    public ResponseEntity<byte[]> image(@RequestParam(required=false) String v,@RequestHeader(value="If-None-Match",required=false) String ifNoneMatch) {
+        var metadata=repository.metadata().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if(metadata.getImageVersion()==null || (v!=null && !v.equals(metadata.getImageVersion()))) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        String etag="\""+metadata.getImageVersion()+"\"";
+        CacheControl policy=v==null ? CacheControl.noCache() : CacheControl.maxAge(java.time.Duration.ofDays(365)).cachePublic().immutable();
+        if(etag.equals(ifNoneMatch)) return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).cacheControl(policy).build();
         StorefrontHero hero = repository.findById(1L).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (hero.getImage() == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(hero.getContentType()))
-                .cacheControl(CacheControl.noCache()).body(hero.getImage());
+                .eTag(etag).cacheControl(policy).body(hero.getImage());
     }
 
     @PutMapping(value = "/api/admin/storefront/hero", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

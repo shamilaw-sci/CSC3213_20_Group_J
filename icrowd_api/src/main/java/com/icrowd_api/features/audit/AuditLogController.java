@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/audit-logs")
-@CrossOrigin(origins = {"http://localhost:5173", "${cors.allowed.origins:http://localhost:5173}"})
 @PreAuthorize("hasRole('ADMIN')")
 public class AuditLogController {
 

@@ -1,0 +1,43 @@
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 21.88 s -- in com.icrowd_api.features.analytics.AnalyticsServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.649 s -- in 1. Availability Risk & Security Guardrails
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in 2. Authoritative Shared Policy Delivery & Warranty Tests
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.059 s -- in 3. Language Evaluation Cases (Sinhala, English, Transliterated Singlish)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in 4. Device Compatibility & Incompatible Combinations
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in 6. Session Memory & Multi-Turn Conversation Context
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in 5. Ambiguous Requests and Stock Availability
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.965 s -- in com.icrowd_api.features.assistant.AiChatServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.121 s -- in 5. Data Minimization & Pagination
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.104 s -- in 2. Reauthentication Requirement
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s -- in 8. Price & Stock Audit Logging
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in 6. Narrower Permissions & Authority Mapping
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in 1. Last Active Administrator Protection
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.202 s -- in 7. BOLA Ownership Boundaries
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in 3. Role & Profile Records Consistency
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in 4. Controlled Deactivation
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.729 s -- in Admin Authorization & Business Controls Tests (OWASP)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.333 s -- in com.icrowd_api.features.auth.AdministratorConcurrencyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.379 s -- in com.icrowd_api.features.auth.AuthControllerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.196 s -- in com.icrowd_api.features.auth.security.JwtUtilTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.icrowd_api.features.auth.security.LoginAttemptServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.755 s -- in com.icrowd_api.features.auth.SecurityRegressionIntegrationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.176 s -- in com.icrowd_api.features.auth.UserServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.334 s -- in com.icrowd_api.features.marketing.MarketingIntegrationTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in com.icrowd_api.features.order.OrderServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.icrowd_api.features.order.OrderStatusConverterTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in com.icrowd_api.features.order.PayHereClientTest
+[INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.811 s -- in com.icrowd_api.features.order.PaymentServiceTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.230 s -- in com.icrowd_api.features.product.ProductServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.125 s -- in com.icrowd_api.features.recommendation.RecommendationServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.026 s -- in com.icrowd_api.features.review.ProductFeedbackIntegrationTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in com.icrowd_api.features.review.ReviewTitleGeneratorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.459 s -- in com.icrowd_api.features.storefront.StorefrontIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.622 s -- in com.icrowd_api.IcrowdApiApplicationTests
+[INFO] Tests run: 145, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-11-15T14:53:20+05:30
+
+After final forecast accuracy correction:
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.82 s -- in com.icrowd_api.features.analytics.AnalyticsServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-11-15T15:00:05+05:30

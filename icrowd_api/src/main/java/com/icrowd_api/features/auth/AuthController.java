@@ -58,7 +58,9 @@ public class AuthController {
      */
     @PostMapping("/register-admin")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> registerAdmin(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> registerAdmin(@Valid @RequestBody RegisterRequest registerRequest,
+            @RequestHeader("X-Admin-Password") String confirmation, Authentication authentication) {
+        userService.validateAdminPassword(authentication.getName(), confirmation);
         String result = userService.registerAdmin(registerRequest);
         if (result != null && result.contains("successfully")) {
             return ResponseEntity.ok().body(Map.of("message", result));
@@ -68,7 +70,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData) {
-        String email = loginData != null ? loginData.get("email") : null;
+        String email = EmailAddress.canonical(loginData != null ? loginData.get("email") : null);
         String password = loginData != null ? loginData.get("password") : null;
         String clientIp = getClientIp();
 
@@ -166,8 +168,8 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Target email is required"));
         }
 
-        // If password is provided, validate reauthentication
-        if (confirmPassword != null && !confirmPassword.isBlank()) {
+        // All promotion routes require fresh authentication.
+        {
             try {
                 userService.validateAdminPassword(actorEmail, confirmPassword);
             } catch (SecurityException e) {
@@ -185,10 +187,6 @@ public class AuthController {
     private String getClientIp() {
         if (httpRequest == null) {
             return null;
-        }
-        String xf = httpRequest.getHeader("X-Forwarded-For");
-        if (xf != null && !xf.isBlank()) {
-            return xf.split(",")[0].trim();
         }
         return httpRequest.getRemoteAddr();
     }

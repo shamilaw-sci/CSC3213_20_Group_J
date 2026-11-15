@@ -1,0 +1,217 @@
+[
+  {
+    "package": "node_modules/@babel/code-frame",
+    "lockVersion": "7.29.0",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/compat-data",
+    "lockVersion": "7.29.0",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/core",
+    "lockVersion": "7.29.0",
+    "installedVersion": "7.29.13"
+  },
+  {
+    "package": "node_modules/@babel/generator",
+    "lockVersion": "7.29.1",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/helper-compilation-targets",
+    "lockVersion": "7.28.6",
+    "installedVersion": "7.29.13"
+  },
+  {
+    "package": "node_modules/@babel/helper-globals",
+    "lockVersion": "7.28.0",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/helper-module-imports",
+    "lockVersion": "7.28.6",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/helper-module-transforms",
+    "lockVersion": "7.28.6",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/helper-string-parser",
+    "lockVersion": "7.27.1",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/helper-validator-identifier",
+    "lockVersion": "7.28.5",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/helper-validator-option",
+    "lockVersion": "7.27.1",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/helpers",
+    "lockVersion": "7.29.2",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/parser",
+    "lockVersion": "7.29.2",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/template",
+    "lockVersion": "7.28.6",
+    "installedVersion": "7.29.7"
+  },
+  {
+    "package": "node_modules/@babel/traverse",
+    "lockVersion": "7.29.0",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@babel/types",
+    "lockVersion": "7.29.0",
+    "installedVersion": "7.29.14"
+  },
+  {
+    "package": "node_modules/@humanfs/core",
+    "lockVersion": "0.19.1",
+    "installedVersion": "0.19.2"
+  },
+  {
+    "package": "node_modules/@humanfs/node",
+    "lockVersion": "0.16.7",
+    "installedVersion": "0.16.8"
+  },
+  {
+    "package": "node_modules/@napi-rs/wasm-runtime",
+    "lockVersion": "1.1.2",
+    "installedVersion": "1.2.6"
+  },
+  {
+    "package": "node_modules/@oxc-project/types",
+    "lockVersion": "0.122.0",
+    "installedVersion": "0.156.0"
+  },
+  {
+    "package": "node_modules/@rolldown/binding-win32-x64-msvc",
+    "lockVersion": "1.0.0-rc.12",
+    "installedVersion": "1.2.19"
+  },
+  {
+    "package": "node_modules/@tybys/wasm-util",
+    "lockVersion": "0.10.1",
+    "installedVersion": "0.10.4"
+  },
+  {
+    "package": "node_modules/axios",
+    "lockVersion": "1.19.0",
+    "installedVersion": "1.21.1"
+  },
+  {
+    "package": "node_modules/brace-expansion",
+    "lockVersion": "1.1.13",
+    "installedVersion": "1.1.22"
+  },
+  {
+    "package": "node_modules/browserslist",
+    "lockVersion": "4.28.1",
+    "installedVersion": "4.29.5"
+  },
+  {
+    "package": "node_modules/electron-to-chromium",
+    "lockVersion": "1.5.328",
+    "installedVersion": "1.5.485"
+  },
+  {
+    "package": "node_modules/follow-redirects",
+    "lockVersion": "1.16.0",
+    "installedVersion": "1.16.3"
+  },
+  {
+    "package": "node_modules/js-yaml",
+    "lockVersion": "4.1.1",
+    "installedVersion": "4.3.2"
+  },
+  {
+    "package": "node_modules/nanoid",
+    "lockVersion": "3.3.11",
+    "installedVersion": "3.3.20"
+  },
+  {
+    "package": "node_modules/node-releases",
+    "lockVersion": "2.0.36",
+    "installedVersion": "2.0.64"
+  },
+  {
+    "package": "node_modules/picomatch",
+    "lockVersion": "4.0.4",
+    "installedVersion": "4.0.7"
+  },
+  {
+    "package": "node_modules/postcss",
+    "lockVersion": "8.5.8",
+    "installedVersion": "8.5.33"
+  },
+  {
+    "package": "node_modules/react-router",
+    "lockVersion": "7.15.0",
+    "installedVersion": "7.18.5"
+  },
+  {
+    "package": "node_modules/react-router-dom",
+    "lockVersion": "7.15.0",
+    "installedVersion": "7.18.5"
+  },
+  {
+    "package": "node_modules/rolldown",
+    "lockVersion": "1.0.0-rc.12",
+    "installedVersion": "1.2.19"
+  },
+  {
+    "package": "node_modules/rolldown/node_modules/@rolldown/pluginutils",
+    "lockVersion": "1.0.0-rc.12",
+    "installedVersion": "1.1.1"
+  },
+  {
+    "package": "node_modules/semver",
+    "lockVersion": "6.3.1",
+    "installedVersion": "6.3.2"
+  },
+  {
+    "package": "node_modules/set-cookie-parser",
+    "lockVersion": "2.7.2",
+    "installedVersion": "2.7.3"
+  },
+  {
+    "package": "node_modules/source-map-js",
+    "lockVersion": "1.2.1",
+    "installedVersion": "1.2.2"
+  },
+  {
+    "package": "node_modules/tinyglobby",
+    "lockVersion": "0.2.15",
+    "installedVersion": "0.2.17"
+  },
+  {
+    "package": "node_modules/update-browserslist-db",
+    "lockVersion": "1.2.3",
+    "installedVersion": "1.3.4"
+  },
+  {
+    "package": "node_modules/vite",
+    "lockVersion": "8.0.3",
+    "installedVersion": "8.3.8"
+  },
+  {
+    "package": "node_modules/zod",
+    "lockVersion": "4.3.6",
+    "installedVersion": "4.6.7"
+  }
+]

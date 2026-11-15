@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const emptyForm = {
     sku: '',
@@ -13,27 +13,13 @@ const emptyForm = {
 };
 
 const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
-    const [form, setForm] = useState(emptyForm);
+    const [form, setForm] = useState(() => product ? {
+        ...product, categoryId: product.category?.id || '', price: product.price ?? '',
+        costPrice: product.costPrice ?? '', leadTimeDays: product.leadTimeDays ?? 7,
+        imageUrls: (product.imageUrls || []).join('\n'), tags: (product.tags || []).join(', '),
+        description: product.description || '', sku: product.sku || '',
+    } : { ...emptyForm, costPrice: '', leadTimeDays: 7 });
     const [errors, setErrors] = useState({});
-
-    useEffect(() => {
-        if (product) {
-            setForm({
-                sku: product.sku || '',
-                name: product.name || '',
-                description: product.description || '',
-                categoryId: product.category?.id || '',
-                price: product.price || '',
-                availableStock: product.availableStock ?? '',
-                imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.join('\n') : '',
-                tags: Array.isArray(product.tags) ? product.tags.join(', ') : '',
-                isActive: product.isActive ?? true,
-            });
-        } else {
-            setForm(emptyForm);
-        }
-        setErrors({});
-    }, [product]);
 
     const validate = () => {
         const e = {};
@@ -41,6 +27,8 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
         if (!form.categoryId) e.categoryId = 'Category is required';
         if (!form.price || isNaN(form.price) || +form.price < 0) e.price = 'Valid price required';
         if (form.availableStock === '' || isNaN(form.availableStock) || +form.availableStock < 0) e.availableStock = 'Valid stock required';
+        if (form.costPrice !== '' && (!Number.isFinite(+form.costPrice) || +form.costPrice < 0)) e.costPrice = 'Cost cannot be negative';
+        if (!Number.isInteger(+form.leadTimeDays) || +form.leadTimeDays < 1 || +form.leadTimeDays > 365) e.leadTimeDays = 'Use 1 to 365 days';
         return e;
     };
 
@@ -61,6 +49,9 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
             description: form.description.trim() || null,
             categoryId: parseInt(form.categoryId),
             price: parseFloat(form.price),
+            costPrice: form.costPrice === '' ? null : Number(form.costPrice),
+            leadTimeDays: Number(form.leadTimeDays),
+            version: product?.version,
             availableStock: parseInt(form.availableStock),
             imageUrls: form.imageUrls ? form.imageUrls.split('\n').map(s => s.trim()).filter(Boolean) : [],
             tags: form.tags ? form.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -134,6 +125,10 @@ const ProductForm = ({ product, categories, onSubmit, onCancel, loading }) => {
                 {errors.categoryId && <p className="text-xs text-red-500 mt-1">{errors.categoryId}</p>}
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <label>Purchase cost (LKR)<input aria-label="Purchase cost (LKR)" type="number" min="0" step="0.01" name="costPrice" value={form.costPrice} onChange={handleChange} className="w-full border rounded-xl p-2"/><span>{errors.costPrice}</span></label>
+              <label>Supplier lead time (days)<input aria-label="Supplier lead time (days)" type="number" min="1" max="365" name="leadTimeDays" value={form.leadTimeDays} onChange={handleChange} className="w-full border rounded-xl p-2"/><span>{errors.leadTimeDays}</span></label>
+            </div>
             {/* Price + Stock */}
             <div className="grid grid-cols-2 gap-4">
                 <div>

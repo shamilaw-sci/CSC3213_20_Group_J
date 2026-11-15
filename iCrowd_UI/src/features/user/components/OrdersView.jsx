@@ -6,8 +6,8 @@ import { formatLkr } from '../../../lib/currency';
 
 export default function OrdersView({ filterType = 'all' }) {
   const [tab, setTab] = useState(['returns', 'cancellations'].includes(filterType) ? filterType : 'all');
-  const { orders, loading, error, retry } = useOrders();
-  const filtered = orders.filter(order => tab === 'all' || (tab === 'current' && ['PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'FAILED'].includes(order.status)) || (tab === 'delivered' && order.status === 'COMPLETED') || (tab === 'returns' && ['REFUNDED', 'REFUND_PENDING'].includes(order.paymentStatus)) || (tab === 'cancellations' && order.status === 'CANCELLED'));
+  const { orders, loading, error, retry, hasMore, loadMore } = useOrders();
+  const filtered = orders.filter(order => tab === 'all' || (tab === 'current' && ['PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'FAILED'].includes(order.status)) || (tab === 'delivered' && ['COMPLETED','DELIVERED'].includes(order.status)) || (tab === 'returns' && ['REFUNDED', 'REFUND_PENDING'].includes(order.paymentStatus)) || (tab === 'cancellations' && order.status === 'CANCELLED'));
   return <section className="space-y-5">
     <div className="flex flex-wrap gap-2" aria-label="Filter orders">{[['all', 'All orders'], ['current', 'In progress'], ['delivered', 'Delivered'], ['returns', 'Refunds'], ['cancellations', 'Cancelled']].map(([value, label]) => <button key={value} onClick={() => setTab(value)} aria-pressed={tab === value} className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === value ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>{label}</button>)}</div>
     {loading ? <p role="status" className="p-6">Loading your orders…</p> : error ? <div role="alert" className="rounded-2xl bg-red-50 p-6 text-red-700">{error} <button onClick={retry} className="underline">Retry</button></div> : filtered.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><Package className="mx-auto mb-4 text-slate-400" size={36}/><h2 className="text-lg font-bold">No orders here yet</h2><p className="mt-2 text-sm text-slate-600">Your purchases will appear here with their latest status.</p><Link to="/search" className="mt-5 inline-block rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white">Browse products</Link></div> : filtered.map(order => <article key={order.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -17,5 +17,6 @@ export default function OrdersView({ filterType = 'all' }) {
       <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4"><div><p className="text-xs text-slate-500">Order total</p><strong className="text-xl">{formatLkr(order.total)}</strong></div><Link to={`/checkout/success?orderId=${order.id}`} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white">{order.status === 'STOCK_UNAVAILABLE' ? 'View refund status' : 'View order status'}</Link></footer>
       </div>
     </article>)}
+    {hasMore && !loading && <button onClick={loadMore} className="border rounded-xl px-6 py-3">Load more orders</button>}
   </section>;
 }

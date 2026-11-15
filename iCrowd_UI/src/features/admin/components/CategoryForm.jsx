@@ -1,17 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const CategoryForm = ({ category, onSubmit, onCancel, loading }) => {
-    const [form, setForm] = useState({ name: '', description: '' });
+    const [form, setForm] = useState(() => ({ name: category?.name || '', description: category?.description || '' }));
     const [errors, setErrors] = useState({});
-
-    useEffect(() => {
-        if (category) {
-            setForm({ name: category.name || '', description: category.description || '' });
-        } else {
-            setForm({ name: '', description: '' });
-        }
-        setErrors({});
-    }, [category]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

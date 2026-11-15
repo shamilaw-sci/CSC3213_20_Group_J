@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { switchOrderToCod } from '../api/checkoutApi';
 
 export default function SwitchToCodButton({ orderId, disabled = false }) {

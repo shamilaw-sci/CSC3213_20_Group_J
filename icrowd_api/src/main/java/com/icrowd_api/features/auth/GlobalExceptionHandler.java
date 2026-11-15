@@ -11,6 +11,11 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<?> conflict(Exception ex) {
+        return ResponseEntity.status(409).body(Map.of("message","This record changed. Reload it before saving."));
+    }
+
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleValidationExceptions(MethodArgumentNotValidException ex) {
@@ -47,9 +52,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(403).body(Map.of("message", "Access denied: insufficient permissions"));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> invalidInput(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message",ex.getMessage()==null ? "Invalid request" : ex.getMessage()));
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneralExceptions(Exception ex) {
-        return ResponseEntity.badRequest().body(Map.of("message",
-                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred"));
+        org.slf4j.LoggerFactory.getLogger(getClass()).error("Request failed: {}", ex.getClass().getSimpleName());
+        return ResponseEntity.internalServerError().body(Map.of("message","The request could not be completed. Please try again."));
     }
 }
