@@ -10,6 +10,8 @@ import com.icrowd_api.features.product.ProductRepository;
 import com.icrowd_api.features.promo.PromoCodeService;
 import com.icrowd_api.features.promo.PromoValidationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -435,5 +437,158 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Order findById(Long orderId) {
         return orderRepository.findById(orderId).orElse(null);
+    }
+
+    // ─── Admin Order Management ───────────────────────────────────────────────
+
+    public AdminOrderSummaryDto convertToAdminSummaryDto(Order order) {
+        if (order == null) return null;
+
+        List<AdminOrderItemDto> itemDtos = new ArrayList<>();
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                Product p = item.getProduct();
+                String img = null;
+                String sku = null;
+                String pName = "Product #" + (p != null ? p.getId() : "Unknown");
+                if (p != null) {
+                    pName = p.getName();
+                    sku = p.getSku();
+                    if (p.getImageUrls() != null && !p.getImageUrls().isEmpty()) {
+                        img = p.getImageUrls().get(0);
+                    }
+                }
+                BigDecimal price = item.getPriceAtTimeOfPurchase() != null ? item.getPriceAtTimeOfPurchase() : BigDecimal.ZERO;
+                BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0));
+
+                itemDtos.add(AdminOrderItemDto.builder()
+                        .id(item.getId())
+                        .productId(p != null ? p.getId() : null)
+                        .productName(pName)
+                        .sku(sku)
+                        .imageUrl(img)
+                        .quantity(item.getQuantity())
+                        .unitPrice(price)
+                        .lineTotal(lineTotal)
+                        .build());
+            }
+        }
+
+        String customerName = order.getShippingFullName();
+        String customerEmail = order.getShippingEmail();
+        String customerPhone = order.getShippingPhone();
+        if (order.getUser() != null) {
+            if (customerEmail == null || customerEmail.isBlank()) {
+                customerEmail = order.getUser().getEmail();
+            }
+            if ((customerName == null || customerName.isBlank()) && order.getUser().getCustomer() != null) {
+                customerName = ((order.getUser().getCustomer().getFirstName() != null ? order.getUser().getCustomer().getFirstName() : "") + " "
+                        + (order.getUser().getCustomer().getLastName() != null ? order.getUser().getCustomer().getLastName() : "")).trim();
+            }
+        }
+        if (customerName == null || customerName.isBlank()) {
+            customerName = customerEmail != null ? customerEmail : "Customer #" + (order.getUser() != null ? order.getUser().getId() : "N/A");
+        }
+
+        return AdminOrderSummaryDto.builder()
+                .id(order.getId())
+                .orderReference(order.getOrderReference())
+                .userId(order.getUser() != null ? order.getUser().getId() : null)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .customerPhone(customerPhone)
+                .status(order.getStatus())
+                .paymentStatus(order.getPaymentStatus())
+                .paymentMethod(order.getPaymentMethod())
+                .deliveryType(order.getDeliveryType())
+                .subTotal(order.getSubTotal())
+                .discount(order.getDiscount())
+                .shippingCost(order.getShippingCost())
+                .totalAmount(order.getTotalAmount())
+                .currency(order.getCurrency() != null ? order.getCurrency() : "LKR")
+                .shippingAddress(order.getShippingAddress())
+                .shippingDistrict(order.getShippingDistrict())
+                .shippingLat(order.getShippingLat())
+                .shippingLng(order.getShippingLng())
+                .receiptUrl(order.getReceiptUrl())
+                .itemCount(itemDtos.size())
+                .items(itemDtos)
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminOrderSummaryDto> getOrdersForAdmin(Pageable pageable, String search, OrderStatus status) {
+        Page<Order> orderPage;
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        if (cleanSearch != null) {
+            orderPage = orderRepository.searchOrdersAdmin(cleanSearch, status, pageable);
+        } else if (status != null) {
+            orderPage = orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        } else {
+            orderPage = orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
+
+        return orderPage.map(this::convertToAdminSummaryDto);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminOrderSummaryDto getOrderDetailsForAdmin(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
+        return convertToAdminSummaryDto(order);
+    }
+
+    @Transactional
+    public AdminOrderSummaryDto updateOrderStatusByAdmin(Long orderId, OrderStatus newStatus, String adminEmail) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
+
+        OrderStatus oldStatus = order.getStatus();
+        if (oldStatus == newStatus) {
+            return convertToAdminSummaryDto(order);
+        }
+
+        // If transitioning to CANCELLED, release stock if allocated
+        if (newStatus == OrderStatus.CANCELLED) {
+            releaseOrderStock(order);
+        }
+
+        // If completing a Cash on Delivery order, mark payment as SUCCESS
+        if ((newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED)
+                && order.getPaymentMethod() == PaymentMethod.COD
+                && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY) {
+            order.setPaymentStatus(PaymentStatus.SUCCESS);
+        }
+
+        order.setStatus(newStatus);
+        Order updated = orderRepository.save(order);
+
+        return convertToAdminSummaryDto(updated);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getOrderDashboardStats() {
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("totalOrders", orderRepository.count());
+        stats.put("pendingPaymentOrders", orderRepository.countByStatus(OrderStatus.PENDING_PAYMENT));
+        stats.put("confirmedOrders", orderRepository.countByStatus(OrderStatus.CONFIRMED));
+        stats.put("processingOrders", orderRepository.countByStatus(OrderStatus.PROCESSING));
+        stats.put("shippedOrders", orderRepository.countByStatus(OrderStatus.SHIPPED));
+        stats.put("deliveredOrders", orderRepository.countByStatus(OrderStatus.DELIVERED));
+        stats.put("completedOrders", orderRepository.countByStatus(OrderStatus.COMPLETED));
+        stats.put("cancelledOrders", orderRepository.countByStatus(OrderStatus.CANCELLED));
+        stats.put("totalRevenue", orderRepository.calculateTotalRevenue());
+
+        List<Order> recent = orderRepository.findTop5ByOrderByCreatedAtDesc();
+        List<AdminOrderSummaryDto> recentDtos = recent.stream()
+                .map(this::convertToAdminSummaryDto)
+                .toList();
+        stats.put("recentOrders", recentDtos);
+
+        return stats;
+
     }
 }

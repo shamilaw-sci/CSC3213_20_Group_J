@@ -15,6 +15,7 @@ import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminProducts from './features/admin/pages/AdminProducts.jsx';
 import AdminCategories from './features/admin/pages/AdminCategories.jsx';
 import AdminUsers from './features/admin/pages/AdminUsers.jsx';
+import AdminOrders from './features/admin/pages/AdminOrders.jsx';
 import AdminPromoCodes from './features/admin/pages/AdminPromoCodes.jsx';
 import AnalyticsPage from './features/analytics/pages/AnalyticsPage.jsx';
 import ProfilePage from './features/user/pages/ProfilePage.jsx';
@@ -113,6 +114,7 @@ function App() {
               }
             >
               <Route index element={<AdminDashboard />} />
+              <Route path="orders" element={<AdminOrders />} />
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="storefront" element={<AdminStorefront />} />
               <Route path="products" element={<AdminProducts />} />
