@@ -65,10 +65,30 @@ class SecurityRegressionIntegrationTest {
     }
     @Test void inventoryStaffCanReachInventoryButNotAccountsOrAnalytics() throws Exception {
         String staff=token(user("INVENTORY_MANAGER"));
-        assertEquals(200,call("GET","/admin/dashboard",null,staff).statusCode());
+        var dashboard=call("GET","/admin/dashboard",null,staff);
+        assertEquals(200,dashboard.statusCode());
+        assertFalse(dashboard.body().contains("recentOrders"));
+        assertFalse(dashboard.body().contains("totalRevenue"));
+        assertEquals(403,call("GET","/admin/orders",null,staff).statusCode());
+        assertEquals(403,call("PATCH","/admin/orders/1/status","{\"status\":\"SHIPPED\"}",staff).statusCode());
         assertEquals(200,call("GET","/products/admin/all",null,staff).statusCode());
         assertEquals(403,call("GET","/admin/users",null,staff).statusCode());
         assertEquals(403,call("GET","/analytics/summary",null,staff).statusCode());
+    }
+    @Test void administratorOrderListingIsBoundedAndUsesConfiguredCors() throws Exception {
+        String admin=token(user("ADMIN"));
+        var list=call("GET","/admin/orders?size=2147483647&page=-1",null,admin);
+        assertEquals(200,list.statusCode(),list.body());
+        assertTrue(list.body().contains("\"size\":100"),list.body());
+        assertEquals(404,call("GET","/admin/orders/9223372036854775807",null,admin).statusCode());
+        assertEquals(401,call("GET","/admin/orders",null,null).statusCode());
+        var preflight=client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/admin/orders"))
+            .header("Origin","https://untrusted.example").header("Access-Control-Request-Method","GET")
+            .method("OPTIONS",HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(403,preflight.statusCode());
+        var dashboard=call("GET","/admin/dashboard",null,admin);
+        assertEquals(200,dashboard.statusCode(),dashboard.body());
+        assertTrue(dashboard.body().contains("recentOrders"));
     }
     @Test void legacyCheckoutAndPublicUploadsAreClosed() throws Exception {
         assertEquals(410,call("POST","/orders/checkout","{}",token(user("CUSTOMER"))).statusCode());

@@ -64,8 +64,56 @@ test('inventory staff can manage stock and cannot enter account administration',
   await expect(page.getByRole('link', { name: 'Products', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Users', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Orders', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Recent Orders', { exact: true })).toHaveCount(0);
+  await page.goto('/admin/orders');
+  await expect(page).toHaveURL(/\/login$/);
   await page.goto('/admin/users');
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('merged administrator order screen updates fulfillment and downloads private receipts with authentication', async ({ page, context }) => {
+  await setup(context, 'ADMIN');
+  const order = { id: 51, orderReference: 'ORD-MERGE-51', customerName: 'Test Buyer', customerEmail: 'buyer@example.test',
+    customerPhone: '0712345678', shippingAddress: 'Test Street', shippingDistrict: 'Colombo', status: 'CONFIRMED',
+    paymentStatus: 'DUE_ON_DELIVERY', paymentMethod: 'COD', deliveryType: 'STANDARD', totalAmount: 1000,
+    itemCount: 1, items: [], receiptUrl: '/api/orders/51/receipt' };
+  await page.route('**/api/admin/orders?**', route => route.fulfill({ json: { content: [order], totalPages: 1, totalElements: 1 } }));
+  await page.route('**/api/admin/orders/stats', route => route.fulfill({ json: { totalOrders: 1, confirmedOrders: 1 } }));
+  await page.route('**/api/admin/orders/51/status', route => route.fulfill({ json: { ...order, status: route.request().postDataJSON().status } }));
+  await page.route('**/api/orders/51/receipt', route => route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.4 test receipt' }));
+  await page.goto('/admin/orders');
+  await expect(page.getByRole('heading', { name: 'Order Management' })).toBeVisible();
+  await page.getByRole('button', { name: 'View Details', exact: true }).click();
+  const receiptRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/orders/51/receipt');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download Uploaded Receipt' }).click();
+  expect((await receiptRequest).headers().authorization).toBe('Bearer account-1');
+  expect((await download).suggestedFilename()).toBe('order-51-receipt.pdf');
+  await page.goto('/admin/orders');
+  await page.getByRole('button', { name: 'Update Status', exact: true }).click();
+  await page.locator('input[type="radio"][value="SHIPPED"]').check();
+  await page.getByPlaceholder('e.g. Courier tracking #PR12345678').fill('TEST-TRACKING');
+  const update = page.waitForRequest(request => request.method() === 'PATCH' && new URL(request.url()).pathname === '/api/admin/orders/51/status');
+  await page.getByRole('button', { name: 'Update Status', exact: true }).last().click();
+  expect((await update).postDataJSON()).toEqual({ status: 'SHIPPED', note: 'TEST-TRACKING' });
+  await expect(page.locator('tbody')).toContainText('SHIPPED');
+});
+
+test('merged customer order history retains pagination and includes dispatched orders in progress', async ({ page, context }) => {
+  await setup(context);
+  await page.route('**/api/orders?**', route => {
+    const secondPage = new URL(route.request().url()).searchParams.get('page') === '1';
+    return route.fulfill({ json: { content: [{ id: secondPage ? 52 : 51, reference: secondPage ? 'ORD-NEXT-52' : 'ORD-SHIPPED-51',
+      status: 'SHIPPED', paymentStatus: 'DUE_ON_DELIVERY', paymentMethod: 'COD', totalAmount: 1000, items: [] }], last: secondPage } });
+  });
+  await page.goto('/profile?tab=orders');
+  await page.getByRole('button', { name: 'In progress', exact: true }).click();
+  await expect(page.getByText('ORD-SHIPPED-51', { exact: true })).toBeVisible();
+  await expect(page.getByText('Dispatched / In Transit', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Load more orders', exact: true }).click();
+  await expect(page.getByText('ORD-NEXT-52', { exact: true })).toBeVisible();
+  await expect(page.getByText('ORD-SHIPPED-51', { exact: true })).toBeVisible();
 });
 
 test('chargebacks and manual review never display an order confirmation or payment retry', async ({ page, context }) => {

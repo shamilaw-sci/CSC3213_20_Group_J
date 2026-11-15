@@ -12,6 +12,7 @@ const RegisterPage = lazy(() => import('./features/auth/pages/RegisterPage.jsx')
 import AdminRoute from './features/admin/components/AdminRoute.jsx';
 const AdminStorefront = lazy(() => import('./features/admin/pages/AdminStorefront.jsx'));
 const AdminDashboard = lazy(() => import('./features/admin/pages/AdminDashboard.jsx'));
+const AdminOrders = lazy(() => import('./features/admin/pages/AdminOrders.jsx'));
 const AdminProducts = lazy(() => import('./features/admin/pages/AdminProducts.jsx'));
 const AdminCategories = lazy(() => import('./features/admin/pages/AdminCategories.jsx'));
 const AdminUsers = lazy(() => import('./features/admin/pages/AdminUsers.jsx'));
@@ -115,6 +116,7 @@ function App() {
               }
             >
               <Route index element={<AdminDashboard />} />
+              <Route path="orders" element={<AdminRoute roles={["ADMIN"]}><AdminOrders /></AdminRoute>} />
               <Route path="payments" element={<AdminRoute roles={["ADMIN"]}><AdminPayments /></AdminRoute>} />
               <Route path="analytics" element={<AdminRoute roles={["ADMIN"]}><AnalyticsPage /></AdminRoute>} />
               <Route path="storefront" element={<AdminRoute roles={["ADMIN"]}><AdminStorefront /></AdminRoute>} />

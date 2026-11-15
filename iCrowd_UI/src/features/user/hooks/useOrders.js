@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../../../lib/axios';
-export const orderLabel = order => ({ CHARGEBACK: 'Payment disputed', REVIEW_REQUIRED: 'Payment under review', REFUND_PENDING: 'Refund in progress', REFUNDED: 'Refunded' }[order.paymentStatus]) || (order.status === 'STOCK_UNAVAILABLE' ? 'Refund in progress' : ({ PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PROCESSING: 'Preparing your order', SHIPPED: 'Shipped', DELIVERED: 'Delivered', COMPLETED: 'Delivered', FAILED: 'Payment unsuccessful', CANCELLED: 'Cancelled' }[order.status] || 'Order received'));
+export const orderLabel = order => ({ CHARGEBACK: 'Payment disputed', REVIEW_REQUIRED: 'Payment under review', REFUND_PENDING: 'Refund in progress', REFUNDED: 'Refunded' }[order.paymentStatus]) || (order.status === 'STOCK_UNAVAILABLE' ? 'Refund in progress' : ({ PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PROCESSING: 'Preparing your order', SHIPPED: 'Dispatched / In Transit', DELIVERED: 'Delivered', COMPLETED: 'Completed', FAILED: 'Payment unsuccessful', CANCELLED: 'Cancelled' }[order.status] || 'Order received'));
 export function useOrders() {
   const [orders,setOrders]=useState([]), [loading,setLoading]=useState(true), [error,setError]=useState('');
   const [page,setPage]=useState(0), [last,setLast]=useState(true), [attempt,setAttempt]=useState(0);

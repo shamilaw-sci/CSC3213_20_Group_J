@@ -1,4 +1,0 @@
-
-> csc3213-20-group-j@0.0.0 lint
-> eslint . --max-warnings=0
-

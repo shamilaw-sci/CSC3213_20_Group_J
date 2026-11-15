@@ -3,6 +3,7 @@ package com.icrowd_api.features.auth;
 import com.icrowd_api.features.auth.dto.AdminUserSummaryDto;
 import com.icrowd_api.features.auth.dto.ReauthRequest;
 import com.icrowd_api.features.category.CategoryService;
+import com.icrowd_api.features.order.OrderService;
 import com.icrowd_api.features.product.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,9 @@ public class AdminController {
 
     @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private OrderService orderService;
 
     // ── User Management ────────────────────────────────────────────────────────
 
@@ -132,13 +136,16 @@ public class AdminController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> getDashboard() {
+    public ResponseEntity<Map<String, Object>> getDashboard(Authentication authentication) {
         java.util.Map<String, Long> productStats = productService.getDashboardStats();
         java.util.Map<String, Object> dashboard = new java.util.HashMap<>(productStats);
         dashboard.put("totalCategories", categoryService.getTotalCount());
         dashboard.put("totalUsers", userService.countUsers());
         dashboard.put("recentProducts", productService.getRecentProducts(5));
         dashboard.put("lowStockProducts", productService.getLowStockProducts(5));
+        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            dashboard.putAll(orderService.getOrderDashboardStats());
+        }
         return ResponseEntity.ok(dashboard);
     }
 }

@@ -25,7 +25,7 @@ Code and configuration changes have been implemented for the 45 findings that st
 | Application/database compatibility | Both fresh and upgraded legacy schemas passed Hibernate validation, checkout record persistence, and daily/hourly analytics SQL execution against isolated PGlite PostgreSQL 18.6. Native PostgreSQL 17 validation is also configured in CI; the hosted CI jobs have not been run from this session. |
 | Diff formatting | `git diff --check` passed. |
 
-Test evidence is in [audit-2026-11-15](audit-2026-11-15/), with new files prefixed `remediation-`. The schema scenarios are recorded in [schema-verification.json](audit-2026-11-15/schema-verification.json). Advisory results are a point-in-time check of known published issues, not proof that all dependencies are defect-free. Production throughput and live merchant/SMTP behavior were not load-tested.
+The table above records the verification results. Reproduction scripts are in [audit-2026-11-15](audit-2026-11-15/). Raw logs and JSON snapshots, including `remediation-*` and `schema-verification.json`, are local ignored artifacts; fresh logs belong in CI artifacts rather than source control. Advisory results are a point-in-time check of known published issues, not proof that all dependencies are defect-free. Production throughput and live merchant/SMTP behavior were not load-tested.
 
 The SQL checks use an isolated WebAssembly build of PostgreSQL and its local connection adapter, documented by [PGlite](https://pglite.dev/docs/) and [PGlite Socket](https://pglite.dev/docs/pglite-socket). They do not connect to the application's configured database. The Java validator uses simple-query mode because the adapter retains prepared statements across client connections; that mode is a test-adapter setting, not a production configuration change.
 
@@ -81,5 +81,13 @@ The SQL checks use an isolated WebAssembly build of PostgreSQL and its local con
 | F46 — Broken product links | Recommendation/product links consistently use the actual `/product/:id` route. |
 
 ## Release requirements
+
+### Developer branch integration on 15 November
+
+Merged `developer` at `f8295e7` into `feature/catalog` based on `a185931`, preserving lazy routes, protected administrator screens, paginated order history, payment-dispute labels, and the isolated local database profile. The incoming order-management screens use the existing authentication and configured CORS rules. Fulfillment updates hold the order lock, reject invalid reversals and unresolved payment cancellation, and record status/tracking notes in the audit history. Inventory staff do not receive customer order details on the shared dashboard. Receipt downloads use the authenticated API.
+
+Post-merge validation: **166 backend tests passed**, **31 browser tests passed with retries disabled**, **4 frontend unit tests passed**, lint passed with no warnings, and backend packaging/frontend production builds passed. Browser checks used a disposable local database; the online database was not used for merge testing. The new receipt test was corrected to expect the browser's `.pdf` filename extension before the complete browser suite passed.
+
+Tracked crash logs, raw audit output, and incoming backup copies were removed from the index and kept locally. See [repository file guidance](repository-files.md). This cleanup does not rewrite previous commits.
 
 Follow [deployment.md](deployment.md) before starting a persistent installation. In particular: apply the correct database script to a backed-up, stopped environment; generate a new private signing key; configure verified database TLS and HTTPS origins; provision the first administrator explicitly if needed; and validate the merchant/SMTP integrations in their test environments. Deployed secrets, shared rate limiting and ambiguous historical data cannot be corrected safely by assuming values from the repository.
