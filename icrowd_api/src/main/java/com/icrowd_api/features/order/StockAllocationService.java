@@ -25,7 +25,7 @@ public class StockAllocationService {
         }
         Map<Long, Product> locked = new LinkedHashMap<>();
         for (var entry : quantities.entrySet()) {
-            Product product = products.findForCheckout(entry.getKey()).orElseThrow();
+            Product product = products.findById(entry.getKey()).orElseThrow();
             // Order creation may already have loaded this entity before a competing checkout committed.
             entityManager.refresh(product, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
             locked.put(entry.getKey(), product);

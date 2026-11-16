@@ -1,0 +1,46 @@
+import { test, expect } from '@playwright/test';
+test('filters combine, reset pagination, survive navigation and clear', async ({ page }) => {
+ const requests=[];
+ const pageErrors=[];
+ page.on('pageerror', error => pageErrors.push(error.message));
+ // Match backend requests without intercepting Vite's /src/**/api/ modules.
+ await page.route(url => url.pathname.startsWith('/api/'), async route => {
+  const url=new URL(route.request().url());
+  if(url.pathname==='/api/categories') return route.fulfill({json:[{id:9,name:'Chargers'},{id:10,name:'Headphones'}]});
+  if(url.pathname==='/api/products/brands') return route.fulfill({json:url.searchParams.get('category') === 'Chargers' ? ['Anker','Belkin'] : ['Sony']});
+  if(url.pathname==='/api/products') { requests.push(url.searchParams); return route.fulfill({json:{content:[],totalElements:0,totalPages:0,number:0,size:8}}); }
+  return route.fulfill({json:{terms:[],categories:[],products:[]}});
+ });
+ await page.goto('/search?page=3');
+ await expect(page.getByRole('combobox',{name:'Brand',exact:true})).toHaveCount(0);
+ await page.getByRole('combobox',{name:'Category',exact:true}).selectOption('Chargers');
+ await expect(page).not.toHaveURL(/page=3/);
+ const brand=page.getByRole('combobox',{name:'Brand',exact:true});
+ await expect(brand.locator('option')).toHaveText(['All brands','Anker','Belkin']);
+ await brand.selectOption('Anker');
+ await expect(page).toHaveURL(/brand=Anker/);
+ await page.getByLabel('Minimum price (LKR)',{exact:true}).fill('500');
+ await page.getByLabel('Maximum price (LKR)',{exact:true}).fill('5000');
+ await page.getByLabel('In stock only').check();
+ await page.getByRole('combobox',{name:'Minimum rating',exact:true}).selectOption('4');
+ await page.getByRole('button',{name:'Apply filters'}).click();
+ await expect(page).toHaveURL(/minPrice=500/);
+ await page.getByRole('combobox',{name:'Sort by',exact:true}).selectOption('rating');
+ await expect.poll(()=>requests.at(-1)?.get('sort')).toBe('rating');
+ const last=requests.at(-1);
+ for(const [key,value] of Object.entries({category:'Chargers',minPrice:'500',maxPrice:'5000',brand:'Anker',inStock:'true',minRating:'4'})) expect(last.get(key)).toBe(value);
+ await page.reload();
+ await expect(page.getByLabel('Minimum price (LKR)',{exact:true})).toHaveValue('500');
+ await page.getByRole('button',{name:'Remove brand filter',exact:true}).click();
+ await expect(brand).toHaveValue('');
+ await page.goBack();
+ await expect(brand).toHaveValue('Anker');
+ await page.getByRole('combobox',{name:'Category',exact:true}).selectOption('Headphones');
+ await expect(page).not.toHaveURL(/brand=/);
+ await expect(brand).toHaveValue('');
+ await expect(brand.locator('option')).toHaveText(['All brands','Sony']);
+ await page.getByRole('button',{name:'Clear all',exact:true}).click();
+ await expect(page).toHaveURL(/\/search$/);
+ await expect(brand).toHaveCount(0);
+ expect(pageErrors).toEqual([]);
+});

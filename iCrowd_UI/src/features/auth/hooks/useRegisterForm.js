@@ -59,7 +59,7 @@ export const useRegisterForm = () => {
             setTimeout(() => {
                 navigate('/login');
             }, 2000);
-        } catch (err) {
+        } catch {
             // Error handled by AuthContext and exposed via authError
         }
     };

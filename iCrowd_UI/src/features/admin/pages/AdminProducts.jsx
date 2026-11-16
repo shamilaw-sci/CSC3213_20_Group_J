@@ -36,14 +36,15 @@ const SlidePanel = ({ isOpen, title, onClose, children }) => (
 );
 
 const AdminProducts = () => {
-    const { products, pagination, loading, error, handleCreate, handleUpdate, handleDelete, goToPage } = useAdminProducts();
+    const [search, setSearch] = useState('');
+    const { products, pagination, loading, error, handleCreate, handleUpdate, handleDelete, goToPage } = useAdminProducts(search);
     const { categories } = useAdminCategories();
 
     const [panelOpen, setPanelOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [formLoading, setFormLoading] = useState(false);
     const [formError, setFormError] = useState(null);
-    const [search, setSearch] = useState('');
+
 
     const openCreate = () => { setEditingProduct(null); setFormError(null); setPanelOpen(true); };
     const openEdit = (product) => { setEditingProduct(product); setFormError(null); setPanelOpen(true); };
@@ -70,12 +71,7 @@ const AdminProducts = () => {
         try { await handleDelete(id); } catch (err) { console.error(err); }
     };
 
-    const filteredProducts = search.trim()
-        ? products.filter(p =>
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
-            (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()))
-        )
-        : products;
+    const filteredProducts = products;
 
     return (
         <div className="space-y-6">
@@ -164,7 +160,7 @@ const AdminProducts = () => {
                 {formError && (
                     <div className="mb-4 bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-600">{formError}</div>
                 )}
-                <ProductForm
+                <ProductForm key={editingProduct?.id || "new"}
                     product={editingProduct}
                     categories={categories}
                     onSubmit={handleSubmit}

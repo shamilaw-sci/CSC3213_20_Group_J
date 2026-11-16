@@ -42,6 +42,8 @@ const AdminRegisterForm = ({ onSuccess, onCancel }) => {
             <AuthAlert type="success" message={successMessage} />
 
             <form onSubmit={handleSubmit} className="space-y-4">
+                <AuthInput id="adminCurrentPassword" name="currentPassword" type="password" label="Your current administrator password" required autoComplete="current-password" value={formData.currentPassword} onChange={handleChange}/>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <AuthInput
                         id="adminFirstName"

@@ -19,6 +19,8 @@ class JwtUtilTest {
             .roles("USER")
             .build();
 
+    @org.junit.jupiter.api.BeforeEach void configureKey() { org.springframework.test.util.ReflectionTestUtils.setField(jwtUtil,"secretKeyString","test-only-unique-32-byte-signing-key-1234567890"); jwtUtil.init(); }
+
     @Test
     void generatedTokenContainsUsernameAndFutureExpiration() {
         String token = jwtUtil.generateToken(user);

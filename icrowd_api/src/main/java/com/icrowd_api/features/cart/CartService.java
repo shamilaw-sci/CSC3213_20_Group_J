@@ -57,14 +57,30 @@ public class CartService {
             }
         }
 
-        return cartRepository.save(cart);
+        Cart saved = cartRepository.save(cart);
+        if (saved.getItems() != null) {
+            saved.getItems().forEach(item -> {
+                if (item.getProduct() != null && item.getProduct().getCategory() != null) {
+                    item.getProduct().getCategory().getName();
+                }
+            });
+        }
+        return saved;
     }
     
     @Transactional(readOnly = true)
     public Cart getCart(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return cartRepository.findByUserId(user.getId())
+        Cart cart = cartRepository.findByUserId(user.getId())
                 .orElseGet(() -> Cart.builder().user(user).build());
+        if (cart.getItems() != null) {
+            cart.getItems().forEach(item -> {
+                if (item.getProduct() != null && item.getProduct().getCategory() != null) {
+                    item.getProduct().getCategory().getName();
+                }
+            });
+        }
+        return cart;
     }
 }

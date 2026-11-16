@@ -1,4 +1,6 @@
+import EmailPreferences from '../components/EmailPreferences';
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { useAddressBook } from '../hooks/useAddressBook';
 import AccountSidebar from '../components/AccountSidebar';
@@ -20,7 +22,8 @@ import ChangePasswordForm from '../components/ChangePasswordForm';
  * E-commerce Manage My Account page (Daraz-inspired structure and UX)
  */
 const ProfilePage = () => {
-    const [activeTab, setActiveTab] = useState('manage-account');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'orders' ? 'orders' : 'manage-account');
     const {
         profile,
         formData,
@@ -36,6 +39,7 @@ const ProfilePage = () => {
     const {
         addresses,
         defaultAddress,
+        error: addressError,
         addAddress,
         updateAddress,
         deleteAddress,
@@ -56,11 +60,11 @@ const ProfilePage = () => {
         setIsAddressModalOpen(true);
     };
 
-    const handleSaveAddress = (addressData) => {
+    const handleSaveAddress = async (addressData) => {
         if (editingAddress) {
-            updateAddress(editingAddress.id, addressData);
+            await updateAddress(editingAddress.id, addressData);
         } else {
-            addAddress(addressData);
+            await addAddress(addressData);
         }
     };
 
@@ -132,6 +136,7 @@ const ProfilePage = () => {
 
                                 {/* Row 3: Promotions & Vouchers */}
                                 <PromotionsCard />
+                                <EmailPreferences />
                             </div>
                         )}
 
@@ -181,6 +186,7 @@ const ProfilePage = () => {
 
                                 <AddressBookView
                                     addresses={addresses}
+                                    error={addressError}
                                     onAddClick={handleOpenAddAddress}
                                     onEditAddress={handleOpenEditAddress}
                                     onDeleteAddress={deleteAddress}
@@ -205,7 +211,7 @@ const ProfilePage = () => {
                                     </button>
                                 </div>
 
-                                <OrdersView filterType={activeTab} />
+                                <OrdersView key={activeTab} filterType={activeTab} />
                             </div>
                         )}
 
@@ -280,6 +286,7 @@ const ProfilePage = () => {
                                 </div>
 
                                 <PromotionsCard />
+                                <EmailPreferences />
                             </div>
                         )}
 

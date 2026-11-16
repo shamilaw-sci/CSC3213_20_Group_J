@@ -58,7 +58,7 @@ const AccountSidebar = ({ activeTab, onTabChange, userName = 'User' }) => {
     return (
         <aside className="w-full lg:w-64 shrink-0 bg-transparent">
             {/* Top Greeting */}
-            <div className="mb-6 px-1">
+            <div className="hidden lg:block mb-6 px-1">
                 <p className="text-xs text-gray-500 font-medium">Welcome back,</p>
                 <h2 className="text-base font-bold text-gray-900 truncate">
                     Hello, <span className="text-black">{userName}</span>
@@ -66,7 +66,8 @@ const AccountSidebar = ({ activeTab, onTabChange, userName = 'User' }) => {
             </div>
 
             {/* Navigation Groups */}
-            <nav className="space-y-6">
+            <label className="block text-sm font-semibold lg:hidden">Account menu<select value={activeTab} onChange={event => onTabChange(event.target.value)} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white p-3">{navGroups.map(group => <optgroup key={group.title} label={group.title}>{group.items.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>)}</select></label>
+            <nav className="hidden lg:block space-y-6">
                 {navGroups.map((group, groupIdx) => (
                     <div key={groupIdx} className="space-y-1.5">
                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">

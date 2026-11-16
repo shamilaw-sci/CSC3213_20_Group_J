@@ -14,4 +14,6 @@ public interface CartRepository extends JpaRepository<Cart, Long> {
 
     @Query("SELECT DISTINCT ci.product.category.id FROM CartItem ci JOIN ci.cart c WHERE c.user.id = :userId")
     List<Long> findUserCartCategoryIds(@Param("userId") Long userId);
+    @Query("SELECT DISTINCT ci.product.id FROM CartItem ci JOIN ci.cart c WHERE c.user.id = :userId")
+    List<Long> findUserCartProductIds(@Param("userId") Long userId);
 }

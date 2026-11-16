@@ -101,11 +101,11 @@ const SearchBar = ({ initialKeyword, onSearch, placeholder = "Search headsets, p
                       className="w-full text-left px-4 py-2 text-gray-700 hover:bg-white hover:text-black transition-all flex items-center gap-4"
                     >
                       <div className="w-10 h-10 rounded-md overflow-hidden bg-white flex-shrink-0 border border-gray-200">
-                        <img src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''} alt={product.name} className="w-full h-full object-cover" />
+                        <img src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''} alt={product.name} className="w-full h-full object-contain" />
                       </div>
                       <div className="flex-1 flex justify-between items-center">
                         <span className="font-medium text-sm line-clamp-1">{product.name}</span>
-                        <span className="text-black font-bold text-sm ml-4">${product.price.toFixed(2)}</span>
+                        <span className="text-black font-bold text-sm ml-4">LKR {Number(product.price).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </Link>
                   </li>

@@ -16,7 +16,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "checkout_key"}))
+@Table(
+    name = "orders",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "checkout_key"}),
+    indexes = {
+        @Index(name = "idx_orders_status_created", columnList = "status, created_at"),
+        @Index(name = "idx_orders_payment_status", columnList = "payment_status"),
+        @Index(name = "idx_orders_user_id", columnList = "user_id")
+    }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -91,6 +99,8 @@ public class Order {
     @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
+    private String receiptFileName;
+    private String receiptContentType;
     private String receiptUrl; // Kept for legacy bank transfer upload compatibility
 
     // Promo Code (optional — null when no code was applied)

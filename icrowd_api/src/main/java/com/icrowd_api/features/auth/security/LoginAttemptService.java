@@ -15,12 +15,14 @@ public class LoginAttemptService {
 
     private final ConcurrentHashMap<String, Integer> attemptsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> lockCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LocalDateTime> attemptExpiry = new ConcurrentHashMap<>();
 
     // ── Single-key API (retained for backward compatibility and email-keyed testing) ──
 
-    public void loginSucceeded(String key) {
+    public synchronized void loginSucceeded(String key) {
         if (key == null) return;
         String normalizedKey = key.trim().toLowerCase();
+        attemptExpiry.remove(normalizedKey);
         attemptsCache.remove(normalizedKey);
         lockCache.remove(normalizedKey);
     }
@@ -65,15 +67,15 @@ public class LoginAttemptService {
         if (email != null && !email.isBlank()) {
             loginSucceeded(email.trim().toLowerCase());
         }
-        if (ip != null && !ip.isBlank()) {
-            loginSucceeded("ip:" + ip.trim());
-        }
+        // A successful login must not reset failures against other accounts from this IP.
     }
 
     // ── Internal Helpers ────────────────────────────────────────────────────────────
 
-    private void recordFailure(String key, int maxAllowed) {
+    private synchronized void recordFailure(String key, int maxAllowed) {
         cleanCacheIfFull();
+        if (!attemptsCache.containsKey(key) && attemptsCache.size() >= MAX_CACHE_ENTRIES) return;
+        attemptExpiry.putIfAbsent(key, LocalDateTime.now().plusMinutes(LOCK_TIME_DURATION));
         int attempts = attemptsCache.getOrDefault(key, 0) + 1;
         attemptsCache.put(key, attempts);
         if (attempts >= maxAllowed) {
@@ -81,7 +83,9 @@ public class LoginAttemptService {
         }
     }
 
-    private boolean checkLocked(String key) {
+    private synchronized boolean checkLocked(String key) {
+        cleanCacheIfFull();
+        if (!attemptsCache.containsKey(key) && attemptsCache.size() >= MAX_CACHE_ENTRIES) return true;
         LocalDateTime lockTime = lockCache.get(key);
         if (lockTime != null) {
             if (lockTime.isBefore(LocalDateTime.now())) {
@@ -94,13 +98,12 @@ public class LoginAttemptService {
         return false;
     }
 
-    private void cleanCacheIfFull() {
-        if (lockCache.size() > MAX_CACHE_ENTRIES || attemptsCache.size() > MAX_CACHE_ENTRIES) {
-            LocalDateTime now = LocalDateTime.now();
-            lockCache.entrySet().removeIf(entry -> entry.getValue().isBefore(now));
-            if (attemptsCache.size() > MAX_CACHE_ENTRIES) {
-                attemptsCache.clear();
+    private synchronized void cleanCacheIfFull() {
+        LocalDateTime now = LocalDateTime.now();
+        attemptExpiry.forEach((key, expiry) -> {
+            if (expiry.isBefore(now) && !lockCache.getOrDefault(key, expiry).isAfter(now)) {
+                attemptsCache.remove(key); lockCache.remove(key); attemptExpiry.remove(key);
             }
-        }
+        });
     }
 }

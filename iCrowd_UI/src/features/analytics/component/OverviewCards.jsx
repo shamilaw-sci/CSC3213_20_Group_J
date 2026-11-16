@@ -6,43 +6,48 @@ import React from 'react';
 const OverviewCards = ({ overview = {} }) => {
   const {
     totalRevenue = 0,
-    totalProfit = 0,
+    totalCost = 0,
+    grossProfit = 0,
+    netProfit = 0,
+    costsEstimated = false,
     profitMargin = 0,
     totalUnitsSold = 0,
+    qualifyingOrderCount = 0,
     inventoryValuation = 0,
     predictedNextMonthRevenue = 0,
     lowStockCount = 0,
-    topCategory = 'Headset',
+    topCategory = 'None',
     dateRangeLabel = 'All Time',
+    isDemoData = false,
   } = overview;
 
   const cards = [
     {
       title: `Revenue (${dateRangeLabel})`,
       value: `Rs ${Number(totalRevenue || 0).toLocaleString()}`,
-      subtext: `${totalUnitsSold?.toLocaleString() || 0} units sold in period`,
+      subtext: `${totalUnitsSold?.toLocaleString() || 0} units sold (${qualifyingOrderCount} qualifying orders)`,
       icon: '💵',
-      badge: '+18.4% Pace',
-      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      badge: isDemoData ? 'Sample Data' : `${qualifyingOrderCount} Orders`,
+      badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       gradient: 'from-blue-600/20 to-indigo-600/5',
       borderColor: 'border-blue-500/30',
     },
     {
-      title: 'Net Profit & Margin',
-      value: `Rs ${Number(totalProfit || 0).toLocaleString()}`,
-      subtext: `${profitMargin}% gross profit margin`,
+      title: costsEstimated ? 'Estimated Net Profit' : 'Net Profit',
+      value: `Rs ${Number(netProfit).toLocaleString()}`,
+      subtext: `Gross profit: Rs ${Number(grossProfit).toLocaleString()} · Cost of goods: Rs ${Number(totalCost).toLocaleString()} (${costsEstimated ? 'includes estimated costs' : 'purchase-time cost'})`,
       icon: '📈',
-      badge: `${profitMargin}% Margin`,
+      badge: `${profitMargin}% Gross Margin`,
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       gradient: 'from-emerald-600/20 to-teal-600/5',
       borderColor: 'border-emerald-500/30',
     },
     {
-      title: 'AI Predicted Next Month',
+      title: 'Projected Next Month',
       value: `Rs ${Number(predictedNextMonthRevenue || 0).toLocaleString()}`,
-      subtext: 'Linear autoregressive demand forecast',
+      subtext: 'Calculated from statistical daily run-rate × 30 days',
       icon: '🔮',
-      badge: 'AI Forecast',
+      badge: 'Demand Forecast',
       badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
       gradient: 'from-purple-600/20 to-pink-600/5',
       borderColor: 'border-purple-500/30',
@@ -80,7 +85,7 @@ const OverviewCards = ({ overview = {} }) => {
           <p className="text-2xl font-bold tracking-tight text-white mb-1">
             {card.value}
           </p>
-          <p className="text-xs text-slate-400 font-medium truncate">
+          <p className="text-xs text-slate-400 font-medium">
             {card.subtext}
           </p>
         </div>

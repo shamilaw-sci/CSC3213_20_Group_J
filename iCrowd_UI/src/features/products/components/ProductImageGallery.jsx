@@ -27,7 +27,7 @@ const ProductImageGallery = ({ images = [] }) => {
         <img
           src={images[activeIndex]}
           alt={`Product view ${activeIndex + 1}`}
-          className="w-full h-full object-cover transition-opacity duration-300"
+          className="w-full h-full object-contain p-4 transition-opacity duration-300"
         />
 
         {images.length > 1 && (
@@ -69,7 +69,7 @@ const ProductImageGallery = ({ images = [] }) => {
               <img
                 src={img}
                 alt={`Thumbnail ${idx + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain p-1"
               />
             </button>
           ))}

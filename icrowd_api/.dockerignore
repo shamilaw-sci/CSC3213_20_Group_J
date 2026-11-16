@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!.mvn
+!.mvn/**
+!mvnw
+!pom.xml
+!src
+!src/**
+**/.env
+**/.env.*
+**/*.log

@@ -1,7 +1,7 @@
 import { apiClient } from '../../../lib/axios';
 
-export const getAllProductsAdmin = async (page = 0, size = 20) => {
-    const response = await apiClient.get(`/products/admin/all?page=${page}&size=${size}`);
+export const getAllProductsAdmin = async (page = 0, size = 20, keyword = '', signal) => {
+    const response = await apiClient.get(`/products/admin/all?page=${page}&size=${size}&keyword=${encodeURIComponent(keyword)}`, { signal });
     return response.data;
 };
 

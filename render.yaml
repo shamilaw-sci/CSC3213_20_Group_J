@@ -1,0 +1,37 @@
+# Create the backend first. README Option 3 explains the frontend and final URLs.
+services:
+  - type: web
+    name: icrowd-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: icrowd_api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: "off"
+    healthCheckPath: /api/products?size=1
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_DDL_AUTO
+        value: validate
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SERVER_FORWARD_HEADERS_STRATEGY
+        value: framework
+      - key: FRONTEND_URL
+        value: http://localhost:5173
+      - key: PUBLIC_API_URL
+        value: http://localhost:8080
+      - key: CORS_ALLOWED_ORIGINS
+        value: http://localhost:5173
+      - key: MARKETING_ENABLED
+        value: "false"
+      - key: PAYHERE_SANDBOX
+        value: "true"

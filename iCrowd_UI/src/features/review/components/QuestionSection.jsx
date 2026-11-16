@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../../lib/axios';
-import { useAuth } from '../../auth/context/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 
 export default function QuestionSection({ productId }) {
   const { user, isAdmin } = useAuth();

@@ -5,7 +5,7 @@ const Footer = () => {
   return (
     <footer className="bg-slate-900 border-t border-slate-800 mt-auto text-slate-400 text-sm">
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* Brand Col */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2">
@@ -42,32 +42,12 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Admin & Portal */}
-          <div>
-            <h4 className="text-white font-semibold mb-3 text-xs uppercase tracking-wider">Store Admin</h4>
-            <p className="text-xs text-slate-400 mb-3">
-              Access the AI-powered sales forecasting and inventory intelligence suite.
-            </p>
-            <Link 
-              to="/admin/analytics" 
-              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-primary/20 border border-slate-700 hover:border-primary/40 text-primary px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            >
-              <span>📊</span>
-              <span>Admin Analytics Portal</span>
-            </Link>
-          </div>
+
         </div>
 
         <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-          <p>© 2026 iCrowd Electronics Ltd. All rights reserved. CSC3213 Project.</p>
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              API Online
-            </span>
-            <span>•</span>
-            <span>AI Forecasting Active</span>
-          </div>
+          <p>© 2026 iCrowd Electronics Ltd. All rights reserved.</p>
+
         </div>
       </div>
     </footer>

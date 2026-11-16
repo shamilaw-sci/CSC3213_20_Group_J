@@ -32,7 +32,7 @@ public class ReviewService {
         return reviews.findByProduct_Id(id, page(page,size)).map(ReviewResponse::fromEntity);
     }
     public boolean purchased(Long productId, Long userId) {
-        return em.createQuery("select count(i) from OrderItem i where i.product.id=:product and i.order.user.id=:user and i.order.status in (com.icrowd_api.features.order.OrderStatus.CONFIRMED, com.icrowd_api.features.order.OrderStatus.PROCESSING, com.icrowd_api.features.order.OrderStatus.COMPLETED)", Long.class)
+        return em.createQuery("select count(i) from OrderItem i where i.product.id=:product and i.order.user.id=:user and i.order.status in (com.icrowd_api.features.order.OrderStatus.CONFIRMED, com.icrowd_api.features.order.OrderStatus.PROCESSING, com.icrowd_api.features.order.OrderStatus.SHIPPED, com.icrowd_api.features.order.OrderStatus.DELIVERED, com.icrowd_api.features.order.OrderStatus.COMPLETED)", Long.class)
             .setParameter("product",productId).setParameter("user",userId).getSingleResult()>0;
     }
     private void content(Review r, ReviewRequest request) {
@@ -68,7 +68,7 @@ public class ReviewService {
         return reviews.findByUser_IdOrderByCreatedAtDesc(user(email).getId()).stream().map(ReviewResponse::fromEntity).toList();
     }
     public java.util.List<java.util.Map<String,Object>> pending(String email) {
-        return em.createQuery("select distinct i.product from OrderItem i where i.order.user.id=:user and i.order.status in (com.icrowd_api.features.order.OrderStatus.CONFIRMED, com.icrowd_api.features.order.OrderStatus.PROCESSING, com.icrowd_api.features.order.OrderStatus.COMPLETED) and i.product.isActive=true and not exists (select r.id from Review r where r.product=i.product and r.user=i.order.user)",Product.class)
+        return em.createQuery("select distinct i.product from OrderItem i where i.order.user.id=:user and i.order.status in (com.icrowd_api.features.order.OrderStatus.CONFIRMED, com.icrowd_api.features.order.OrderStatus.PROCESSING, com.icrowd_api.features.order.OrderStatus.SHIPPED, com.icrowd_api.features.order.OrderStatus.DELIVERED, com.icrowd_api.features.order.OrderStatus.COMPLETED) and i.product.isActive=true and not exists (select r.id from Review r where r.product=i.product and r.user=i.order.user)",Product.class)
             .setParameter("user",user(email).getId()).getResultList().stream().map(p -> java.util.Map.<String,Object>of("id",p.getId(),"name",p.getName())).toList();
     }
 }

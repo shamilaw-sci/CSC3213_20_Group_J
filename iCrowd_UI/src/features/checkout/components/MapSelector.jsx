@@ -85,7 +85,7 @@ const MapSelector = ({ selectedPosition, onLocationSelect }) => {
         <MapController targetPosition={position} />
       </MapContainer>
       <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-black shadow-md z-[400] text-center border border-gray-100 pointer-events-none flex items-center justify-center gap-2">
-        <span>📍</span> Click on map to adjust delivery coordinates {position ? `(${position[0].toFixed(4)}, ${position[1].toFixed(4)})` : ''}
+        <span>📍</span> Tap the map to choose your delivery location
       </div>
     </div>
   );

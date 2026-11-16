@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { AuthContext } from '../../auth/context/AuthContext';
+import { AuthContext } from '../../auth/context/authState';
 import ConfirmModal from './ConfirmModal';
 
 const RoleBadge = ({ role }) => (

@@ -1,6 +1,8 @@
 # --- Frontend Specific ---
 iCrowd_UI/node_modules/
 iCrowd_UI/dist/
+iCrowd_UI/playwright-report/
+iCrowd_UI/test-results/
 
 # --- Java Backend Specific (Maven/Gradle) ---
 icrowd_api/target/
@@ -21,3 +23,53 @@ Thumbs.db
 .env
 .env.local
 icrowd_api/.env
+/local-backups/
+
+# Runtime output and private local diagnostics (never source code)
+*.log
+*.hprof
+*.jfr
+*.dmp
+replay_pid*
+**/untracked_backup/
+
+# Local environment variants; retain safe configuration examples
+.env.*
+!.env.example
+!.env.sample
+
+# Keep one maintained README; other documentation remains local
+*.md
+!/README.md
+/docs/
+
+# Academic deliverables and generated working files
+/outputs/
+/tmp/
+*.pdf
+*.xlsx
+*.xls
+*.xlsm
+*.ods
+*.docx
+*.pptx
+
+# Accidental nested repository and unused starter files
+/CSC3213_20_Group_J/
+/icrowd_api/package-lock.json
+/iCrowd_UI/src/data/mockData.js
+/iCrowd_UI/src/assets/hero.png
+/iCrowd_UI/src/assets/react.svg
+/iCrowd_UI/src/assets/vite.svg
+/iCrowd_UI/public/favicon.svg
+/iCrowd_UI/public/icons.svg
+
+# Local demonstration preparation and recording helpers
+/scripts/assemble-demo.py
+/scripts/check-demo-edit.py
+/scripts/check-demo-mail.py
+/scripts/demo-preview-server.cjs
+/scripts/fetch-demo-email.py
+/scripts/inspect-demo-video.py
+/scripts/prepare-demo.py
+/scripts/record-demo.cjs

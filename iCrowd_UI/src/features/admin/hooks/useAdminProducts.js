@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useDebounce } from '../../products/hooks/useDebounce';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getAllProductsAdmin,
     createProduct,
@@ -6,17 +7,21 @@ import {
     deleteProduct,
 } from '../api/productAdminApi';
 
-export const useAdminProducts = () => {
+export const useAdminProducts = (keyword = '') => {
+    const debouncedKeyword = useDebounce(keyword, 300);
+    const requestId = useRef(0);
     const [products, setProducts] = useState([]);
     const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const fetchProducts = useCallback(async (page = 0) => {
+    const fetchProducts = useCallback(async (page = 0, signal) => {
+        const id = ++requestId.current;
         setLoading(true);
         setError(null);
         try {
-            const data = await getAllProductsAdmin(page, pagination.size);
+            const data = await getAllProductsAdmin(page, pagination.size, debouncedKeyword, signal);
+            if (id !== requestId.current || signal?.aborted) return;
             setProducts(data.content || []);
             setPagination(prev => ({
                 ...prev,
@@ -25,14 +30,16 @@ export const useAdminProducts = () => {
                 totalElements: data.totalElements,
             }));
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to load products');
+            if (id === requestId.current && !signal?.aborted) setError(err.response?.data?.message || 'Failed to load products');
         } finally {
-            setLoading(false);
+            if (id === requestId.current && !signal?.aborted) setLoading(false);
         }
-    }, [pagination.size]);
+    }, [pagination.size, debouncedKeyword]);
 
     useEffect(() => {
-        fetchProducts(0);
+        const controller = new AbortController();
+        fetchProducts(0, controller.signal);
+        return () => controller.abort();
     }, [fetchProducts]);
 
     const handleCreate = async (productData) => {

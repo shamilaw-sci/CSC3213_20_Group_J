@@ -1,183 +1,22 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Package } from 'lucide-react';
+import { useOrders, orderLabel } from '../hooks/useOrders';
+import { formatLkr } from '../../../lib/currency';
 
-/**
- * OrdersView Component
- * Displays order history, tracking, returns, and cancellations.
- */
-const OrdersView = ({ filterType = 'all' }) => {
-    const [selectedTab, setSelectedTab] = useState(
-        filterType === 'returns' ? 'returns' : filterType === 'cancellations' ? 'cancellations' : 'all'
-    );
-
-    const allOrders = [
-        {
-            id: 'ORD-89241',
-            date: '20 August 2026',
-            items: [
-                { title: 'Wireless Noise-Cancelling Headphones', qty: 1, price: 'LKR 18,500' }
-            ],
-            total: 'LKR 18,500',
-            status: 'Processing',
-            statusCategory: 'processing',
-            deliveryAddress: '123 Main Street, Colombo 03',
-            paymentMethod: 'Credit Card (**** 4242)'
-        },
-        {
-            id: 'ORD-76219',
-            date: '12 August 2026',
-            items: [
-                { title: 'Ergonomic Mechanical Keyboard (RGB, Brown Switch)', qty: 1, price: 'LKR 15,900' },
-                { title: 'Memory Foam Wrist Rest Pad', qty: 1, price: 'LKR 9,000' }
-            ],
-            total: 'LKR 24,900',
-            status: 'Delivered',
-            statusCategory: 'delivered',
-            deliveryAddress: '123 Main Street, Colombo 03',
-            paymentMethod: 'Cash on Delivery'
-        },
-        {
-            id: 'ORD-65104',
-            date: '28 July 2026',
-            items: [
-                { title: 'Ultra-thin Laptop Stand & 7-in-1 Hub', qty: 1, price: 'LKR 8,400' }
-            ],
-            total: 'LKR 8,400',
-            status: 'Delivered',
-            statusCategory: 'delivered',
-            deliveryAddress: '45 Office Road, Colombo 02',
-            paymentMethod: 'Credit Card (**** 1122)'
-        },
-        {
-            id: 'ORD-54011',
-            date: '10 July 2026',
-            items: [
-                { title: 'Bluetooth Trackpad', qty: 1, price: 'LKR 11,200' }
-            ],
-            total: 'LKR 11,200',
-            status: 'Cancelled',
-            statusCategory: 'cancellations',
-            deliveryAddress: '123 Main Street, Colombo 03',
-            paymentMethod: 'Refunded to Card'
-        }
-    ];
-
-    const filteredOrders = allOrders.filter(order => {
-        if (selectedTab === 'all') return true;
-        if (selectedTab === 'processing') return order.statusCategory === 'processing';
-        if (selectedTab === 'delivered') return order.statusCategory === 'delivered';
-        if (selectedTab === 'returns') return order.statusCategory === 'returns';
-        if (selectedTab === 'cancellations') return order.statusCategory === 'cancellations';
-        return true;
-    });
-
-    return (
-        <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-sm space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
-                <div>
-                    <h3 className="text-base font-bold text-gray-900">
-                        {filterType === 'returns' ? 'My Returns' : filterType === 'cancellations' ? 'My Cancellations' : 'My Orders'}
-                    </h3>
-                    <p className="text-xs text-gray-500">Track and view previous purchases and delivery status</p>
-                </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3 overflow-x-auto text-xs font-semibold">
-                {[
-                    { id: 'all', label: 'All Orders' },
-                    { id: 'processing', label: 'To Receive / In Transit' },
-                    { id: 'delivered', label: 'Delivered' },
-                    { id: 'returns', label: 'Returns' },
-                    { id: 'cancellations', label: 'Cancellations' }
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setSelectedTab(tab.id)}
-                        className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                            selectedTab === tab.id
-                                ? 'bg-black text-white shadow-sm'
-                                : 'text-gray-500 hover:text-black hover:bg-gray-100'
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Orders List */}
-            {filteredOrders.length === 0 ? (
-                <div className="py-12 text-center text-gray-500 text-xs">
-                    No orders found in this section.
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {filteredOrders.map((order) => (
-                        <div key={order.id} className="border border-gray-200/80 rounded-xl p-4 hover:border-gray-300 transition-all">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-gray-100 text-xs">
-                                <div>
-                                    <span className="font-bold text-gray-900">Order #{order.id}</span>
-                                    <span className="text-gray-400 mx-2">•</span>
-                                    <span className="text-gray-500">Placed on {order.date}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                        order.status === 'Delivered'
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                            : order.status === 'Cancelled'
-                                                ? 'bg-red-50 text-red-700 border border-red-200'
-                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                    }`}>
-                                        {order.status}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="py-3 space-y-2">
-                                {order.items.map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-gray-400">
-                                                📦
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-900">{item.title}</p>
-                                                <p className="text-gray-400 text-[11px]">Qty: {item.qty}</p>
-                                            </div>
-                                        </div>
-                                        <span className="font-semibold text-gray-800">{item.price}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                                <div className="text-gray-500">
-                                    Total: <strong className="text-gray-900">{order.total}</strong> ({order.paymentMethod})
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        Order Details
-                                    </button>
-                                    {order.status === 'Delivered' && (
-                                        <button
-                                            type="button"
-                                            className="px-3 py-1.5 rounded-lg bg-black text-white font-semibold hover:bg-gray-800 cursor-pointer"
-                                        >
-                                            Buy Again
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-export default OrdersView;
+export default function OrdersView({ filterType = 'all' }) {
+  const [tab, setTab] = useState(['returns', 'cancellations'].includes(filterType) ? filterType : 'all');
+  const { orders, loading, error, retry, hasMore, loadMore } = useOrders();
+  const filtered = orders.filter(order => tab === 'all' || (tab === 'current' && ['PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'FAILED'].includes(order.status)) || (tab === 'delivered' && ['COMPLETED','DELIVERED'].includes(order.status)) || (tab === 'returns' && ['REFUNDED', 'REFUND_PENDING'].includes(order.paymentStatus)) || (tab === 'cancellations' && order.status === 'CANCELLED'));
+  return <section className="space-y-5">
+    <div className="flex flex-wrap gap-2" aria-label="Filter orders">{[['all', 'All orders'], ['current', 'In progress'], ['delivered', 'Delivered'], ['returns', 'Refunds'], ['cancellations', 'Cancelled']].map(([value, label]) => <button key={value} onClick={() => setTab(value)} aria-pressed={tab === value} className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === value ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>{label}</button>)}</div>
+    {loading ? <p role="status" className="p-6">Loading your orders…</p> : error ? <div role="alert" className="rounded-2xl bg-red-50 p-6 text-red-700">{error} <button onClick={retry} className="underline">Retry</button></div> : filtered.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><Package className="mx-auto mb-4 text-slate-400" size={36}/><h2 className="text-lg font-bold">No orders here yet</h2><p className="mt-2 text-sm text-slate-600">Your purchases will appear here with their latest status.</p><Link to="/search" className="mt-5 inline-block rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white">Browse products</Link></div> : filtered.map(order => <article key={order.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-5"><div><h2 className="font-bold">{order.reference || `Order #${order.id}`}</h2><p className="mt-1 text-sm text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</p></div><span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">{orderLabel(order)}</span></header>
+      <div className="space-y-5 p-5 sm:p-6"><ul className="space-y-3">{order.items.map(item => <li key={item.productId} className="flex justify-between gap-4 text-sm"><div className="min-w-0"><Link to={`/product/${item.productId}`} className="font-semibold hover:underline">{item.name}</Link><p className="mt-1 text-slate-500">Quantity {item.quantity}</p></div><span className="shrink-0 font-semibold">{formatLkr(item.price * item.quantity)}</span></li>)}</ul>
+      <div className="grid gap-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2"><div><p className="font-semibold">Delivery address</p><p className="mt-1 break-words leading-6 text-slate-600">{[order.address, order.district].filter(Boolean).join(', ') || 'Not available'}</p></div><div><p className="font-semibold">Payment</p><p className="mt-1 text-slate-600">{order.paymentMethod === 'COD' ? 'Cash on delivery' : 'Card payment'}</p></div></div>
+      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4"><div><p className="text-xs text-slate-500">Order total</p><strong className="text-xl">{formatLkr(order.total)}</strong></div><Link to={`/checkout/success?orderId=${order.id}`} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white">{order.status === 'STOCK_UNAVAILABLE' ? 'View refund status' : 'View order status'}</Link></footer>
+      </div>
+    </article>)}
+    {hasMore && !loading && <button onClick={loadMore} className="border rounded-xl px-6 py-3">Load more orders</button>}
+  </section>;
+}

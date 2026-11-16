@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useEffectEvent, useRef } from 'react';
 import L from 'leaflet';
 
 /**
@@ -19,6 +19,8 @@ const InteractiveMapPicker = ({
     const currentLat = latitude ? parseFloat(latitude) : 6.9271;
     const currentLng = longitude ? parseFloat(longitude) : 79.8612;
 
+    const reportChange = useEffectEvent((lat,lng) => onChange?.(lat,lng));
+    const [initialCenter] = React.useState([currentLat,currentLng]);
     useEffect(() => {
         if (!mapContainerRef.current) return;
 
@@ -52,7 +54,7 @@ const InteractiveMapPicker = ({
         // Initialize map if not already done
         if (!mapInstanceRef.current) {
             const map = L.map(mapContainerRef.current, {
-                center: [currentLat, currentLng],
+                center: initialCenter,
                 zoom: 13,
                 zoomControl: true
             });
@@ -62,7 +64,7 @@ const InteractiveMapPicker = ({
                 maxZoom: 19
             }).addTo(map);
 
-            const marker = L.marker([currentLat, currentLng], {
+            const marker = L.marker(initialCenter, {
                 icon: customIcon,
                 draggable: true
             }).addTo(map);
@@ -70,18 +72,14 @@ const InteractiveMapPicker = ({
             // Handle marker drag
             marker.on('dragend', (e) => {
                 const position = e.target.getLatLng();
-                if (onChange) {
-                    onChange(position.lat.toFixed(6), position.lng.toFixed(6));
-                }
+                reportChange(position.lat.toFixed(6), position.lng.toFixed(6));
             });
 
             // Handle map click
             map.on('click', (e) => {
                 const { lat, lng } = e.latlng;
                 marker.setLatLng([lat, lng]);
-                if (onChange) {
-                    onChange(lat.toFixed(6), lng.toFixed(6));
-                }
+                reportChange(lat.toFixed(6), lng.toFixed(6));
             });
 
             mapInstanceRef.current = map;
@@ -93,13 +91,13 @@ const InteractiveMapPicker = ({
             }, 250);
         } else {
             // Update center and marker if coordinates change from parent
-            mapInstanceRef.current.setView([currentLat, currentLng], mapInstanceRef.current.getZoom());
+            mapInstanceRef.current.setView(initialCenter, mapInstanceRef.current.getZoom());
             if (markerRef.current) {
-                markerRef.current.setLatLng([currentLat, currentLng]);
+                markerRef.current.setLatLng(initialCenter);
             }
         }
 
-        return () => {
+    return () => {
             // Cleanup on unmount
             if (mapInstanceRef.current) {
                 mapInstanceRef.current.remove();
@@ -107,7 +105,11 @@ const InteractiveMapPicker = ({
                 markerRef.current = null;
             }
         };
-    }, []);
+    }, [initialCenter]);
+    useEffect(() => {
+        mapInstanceRef.current?.setView([currentLat,currentLng],mapInstanceRef.current.getZoom());
+        markerRef.current?.setLatLng([currentLat,currentLng]);
+    },[currentLat,currentLng]);
 
     return (
         <div className="space-y-2">

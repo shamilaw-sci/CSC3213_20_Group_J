@@ -1,14 +1,14 @@
 import { apiClient } from '../../../lib/axios';
 
-export const fetchSuggestions = async (keyword) => {
+export const fetchSuggestions = async (keyword, signal) => {
   if (!keyword || keyword.trim() === '') return { terms: [], categories: [], products: [] };
   try {
     const response = await apiClient.get(`/products/suggestions`, {
-      params: { q: keyword }
+      params: { q: keyword }, signal
     });
     return response.data;
   } catch (error) {
-    console.error("Failed to fetch suggestions", error);
+    if (error.code === "ERR_CANCELED") throw error;
     return { terms: [], categories: [], products: [] };
   }
 };

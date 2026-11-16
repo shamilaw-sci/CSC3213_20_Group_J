@@ -10,6 +10,8 @@ import com.icrowd_api.features.product.ProductRepository;
 import com.icrowd_api.features.promo.PromoCodeService;
 import com.icrowd_api.features.promo.PromoValidationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +32,9 @@ public class OrderService {
     private StockAllocationService stockAllocationService;
 
     @Autowired
+    private com.icrowd_api.features.audit.AuditLogRepository auditLogRepository;
+
+    @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
@@ -43,6 +48,9 @@ public class OrderService {
 
     @Autowired
     private PromoCodeService promoCodeService;
+
+    @Autowired(required = false)
+    private ShippingPolicy shippingPolicy = new ShippingPolicy();
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(\\+?94|0)?[0-9]{9,10}$");
 
@@ -126,15 +134,15 @@ public class OrderService {
                     .build());
         }
 
-        BigDecimal deliveryFee = request.getDeliveryType() == DeliveryType.FAST
-                ? new BigDecimal("500.00")
-                : new BigDecimal("200.00");
-
-        String estimatedDelivery = request.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        BigDecimal deliveryFee = shippingPolicy.getDeliveryFee(request.getDeliveryType());
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(request.getDeliveryType());
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (StringUtils.hasText(request.getPromoCode())) {
+            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
+            discount = validation.getDiscountAmount();
+        }
         BigDecimal totalAmount = subTotal.subtract(discount).add(deliveryFee).setScale(2, RoundingMode.HALF_UP);
 
         Long savedAddressId = null;
@@ -183,6 +191,13 @@ public class OrderService {
      */
     @Transactional
     public CreateOrderResponse createNewOrder(String email, CreateOrderRequest request) {
+        if (request == null || !StringUtils.hasText(request.getShippingFullName())
+                || !StringUtils.hasText(request.getShippingPhone()) || !StringUtils.hasText(request.getShippingEmail())
+                || !StringUtils.hasText(request.getShippingAddress()) || !StringUtils.hasText(request.getShippingDistrict()))
+            throw new IllegalArgumentException("Complete the recipient, phone, email and delivery address.");
+        if (request.getItems() != null && request.getItems().size() > 100)
+            throw new IllegalArgumentException("An order may contain at most 100 lines.");
+
         User user = userRepository.findForCheckout(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -259,6 +274,7 @@ public class OrderService {
                     .product(product)
                     .quantity(itemDto.getQuantity())
                     .priceAtTimeOfPurchase(product.getPrice())
+                    .costPriceAtTimeOfPurchase(product.getCostPrice())
                     .build();
 
             order.getItems().add(orderItem);
@@ -269,15 +285,14 @@ public class OrderService {
 
         BigDecimal discount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (StringUtils.hasText(request.getPromoCode())) {
-            PromoValidationResponse validation = promoCodeService.validateCode(request.getPromoCode(), email, subTotal);
+            PromoValidationResponse validation = promoCodeService.lockAndValidateCode(request.getPromoCode(), email, subTotal);
             if (!validation.isValid()) throw new IllegalArgumentException(validation.getMessage());
             discount = validation.getDiscountAmount();
         }
+        discount = discount.max(BigDecimal.ZERO).min(subTotal);
         order.setDiscountAmount(discount);
 
-        BigDecimal shippingCost = request.getDeliveryType() == DeliveryType.FAST
-                ? new BigDecimal("500.00")
-                : new BigDecimal("200.00");
+        BigDecimal shippingCost = shippingPolicy.getDeliveryFee(request.getDeliveryType());
 
         BigDecimal totalAmount = subTotal.subtract(discount).add(shippingCost).setScale(2, RoundingMode.HALF_UP);
 
@@ -309,8 +324,7 @@ public class OrderService {
     public CreateOrderResponse switchToCod(String email, Long orderId) {
         // Use the same order lock as payment initiation and provider notifications.
         Order order = orderRepository.findForUpdate(orderId).orElseThrow();
-        if (!order.getUser().getEmail().equalsIgnoreCase(email))
-            throw new IllegalArgumentException("Access denied");
+        OrderAccess.requireOwner(userRepository, order, email);
         if (order.getPaymentMethod() == PaymentMethod.COD && order.isStockAllocated()
                 && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY)
             return orderResponse(order);
@@ -325,6 +339,8 @@ public class OrderService {
         if (order.getPaymentMethod() != PaymentMethod.CARD || order.isStockAllocated()
                 || (!isFailedCardPayment && !isUninitiatedCardPayment))
             throw new IllegalArgumentException("Switching to COD requires a confirmed failed card payment. Pending payments must be verified first.");
+        if (order.getAppliedPromoCode() != null && !promoCodeService.confirmReservation(order))
+            throw new IllegalArgumentException("This promotion is no longer available. Start a new checkout.");
         if (!stockAllocationService.allocate(order))
             throw new OutOfStockException(order.getUnavailableProductId(), order.getUnavailableProductName());
         order.setPaymentMethod(PaymentMethod.COD);
@@ -334,9 +350,7 @@ public class OrderService {
     }
 
     private CreateOrderResponse orderResponse(Order savedOrder) {
-        String estimatedDelivery = savedOrder.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(savedOrder.getDeliveryType());
 
         return CreateOrderResponse.builder()
                 .orderId(savedOrder.getId())
@@ -361,13 +375,9 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
 
-        if (!order.getUser().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("Access denied: You do not have permission to view order #" + orderId);
-        }
+        OrderAccess.requireOwner(userRepository, order, email);
 
-        String estimatedDelivery = order.getDeliveryType() == DeliveryType.FAST
-                ? "1-2 Business Days"
-                : "3-5 Business Days";
+        String estimatedDelivery = shippingPolicy.getEstimatedDelivery(order.getDeliveryType());
 
         return PaymentStatusResponse.builder()
                 .unavailableProductId(order.getUnavailableProductId())
@@ -437,5 +447,183 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Order findById(Long orderId) {
         return orderRepository.findById(orderId).orElse(null);
+    }
+
+    // ─── Admin Order Management ───────────────────────────────────────────────
+
+    public AdminOrderSummaryDto convertToAdminSummaryDto(Order order) {
+        if (order == null) return null;
+
+        List<AdminOrderItemDto> itemDtos = new ArrayList<>();
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                Product p = item.getProduct();
+                String img = null;
+                String sku = null;
+                String pName = "Product #" + (p != null ? p.getId() : "Unknown");
+                if (p != null) {
+                    pName = p.getName();
+                    sku = p.getSku();
+                    if (p.getImageUrls() != null && !p.getImageUrls().isEmpty()) {
+                        img = p.getImageUrls().get(0);
+                    }
+                }
+                BigDecimal price = item.getPriceAtTimeOfPurchase() != null ? item.getPriceAtTimeOfPurchase() : BigDecimal.ZERO;
+                BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0));
+
+                itemDtos.add(AdminOrderItemDto.builder()
+                        .id(item.getId())
+                        .productId(p != null ? p.getId() : null)
+                        .productName(pName)
+                        .sku(sku)
+                        .imageUrl(img)
+                        .quantity(item.getQuantity())
+                        .unitPrice(price)
+                        .lineTotal(lineTotal)
+                        .build());
+            }
+        }
+
+        String customerName = order.getShippingFullName();
+        String customerEmail = order.getShippingEmail();
+        String customerPhone = order.getShippingPhone();
+        if (order.getUser() != null) {
+            if (customerEmail == null || customerEmail.isBlank()) {
+                customerEmail = order.getUser().getEmail();
+            }
+            if ((customerName == null || customerName.isBlank()) && order.getUser().getCustomer() != null) {
+                customerName = ((order.getUser().getCustomer().getFirstName() != null ? order.getUser().getCustomer().getFirstName() : "") + " "
+                        + (order.getUser().getCustomer().getLastName() != null ? order.getUser().getCustomer().getLastName() : "")).trim();
+            }
+        }
+        if (customerName == null || customerName.isBlank()) {
+            customerName = customerEmail != null ? customerEmail : "Customer #" + (order.getUser() != null ? order.getUser().getId() : "N/A");
+        }
+
+        return AdminOrderSummaryDto.builder()
+                .id(order.getId())
+                .orderReference(order.getOrderReference())
+                .userId(order.getUser() != null ? order.getUser().getId() : null)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .customerPhone(customerPhone)
+                .status(order.getStatus())
+                .paymentStatus(order.getPaymentStatus())
+                .paymentMethod(order.getPaymentMethod())
+                .deliveryType(order.getDeliveryType())
+                .subTotal(order.getSubTotal())
+                .discount(order.getDiscount())
+                .shippingCost(order.getShippingCost())
+                .totalAmount(order.getTotalAmount())
+                .currency(order.getCurrency() != null ? order.getCurrency() : "LKR")
+                .shippingAddress(order.getShippingAddress())
+                .shippingDistrict(order.getShippingDistrict())
+                .shippingLat(order.getShippingLat())
+                .shippingLng(order.getShippingLng())
+                .receiptUrl(order.getReceiptUrl())
+                .itemCount(itemDtos.size())
+                .items(itemDtos)
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminOrderSummaryDto> getOrdersForAdmin(Pageable pageable, String search, OrderStatus status) {
+        Page<Order> orderPage;
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        if (cleanSearch != null && cleanSearch.length() > 200) throw new IllegalArgumentException("Search must be at most 200 characters.");
+
+        if (cleanSearch != null) {
+            orderPage = orderRepository.searchOrdersAdmin(cleanSearch, status, pageable);
+        } else if (status != null) {
+            orderPage = orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        } else {
+            orderPage = orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
+
+        return orderPage.map(this::convertToAdminSummaryDto);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminOrderSummaryDto getOrderDetailsForAdmin(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Order not found"));
+        return convertToAdminSummaryDto(order);
+    }
+
+    @Transactional
+    public AdminOrderSummaryDto updateOrderStatusByAdmin(Long orderId, OrderStatus newStatus, String adminEmail, String note) {
+        if (newStatus == null) throw new IllegalArgumentException("Order status is required.");
+        if (note != null && note.length() > 500) throw new IllegalArgumentException("The tracking note must be at most 500 characters.");
+        // Use the same lock as checkout and payment callbacks: stock can be released only once.
+        Order order = orderRepository.findForUpdate(orderId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Order not found"));
+
+        OrderStatus oldStatus = order.getStatus();
+        if (oldStatus == newStatus) {
+            return convertToAdminSummaryDto(order);
+        }
+
+        var fulfillment = List.of(OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED);
+        if (newStatus == OrderStatus.CANCELLED) {
+            if (!List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.FAILED, OrderStatus.CONFIRMED, OrderStatus.PROCESSING).contains(oldStatus))
+                throw new IllegalStateException("Only unshipped active orders can be cancelled here.");
+            boolean cancellablePayment = order.getPaymentStatus() == PaymentStatus.PENDING
+                    || order.getPaymentStatus() == PaymentStatus.FAILED || order.getPaymentStatus() == PaymentStatus.CANCELLED
+                    || (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY);
+            if (!cancellablePayment || paymentRepository.findByOrderId(orderId).stream().anyMatch(p ->
+                    p.getStatus() != PaymentStatus.FAILED && p.getStatus() != PaymentStatus.CANCELLED))
+                throw new IllegalStateException("Paid or unresolved payments require payment review before cancellation.");
+            releaseOrderStock(order);
+            order.setPaymentStatus(PaymentStatus.CANCELLED);
+        } else {
+            if (!fulfillment.contains(oldStatus) || !fulfillment.contains(newStatus)
+                    || fulfillment.indexOf(newStatus) <= fulfillment.indexOf(oldStatus))
+                throw new IllegalStateException("Fulfillment can only move an active order forward.");
+            boolean payable = order.getPaymentStatus() == PaymentStatus.SUCCESS || order.getPaymentStatus() == PaymentStatus.PAID
+                    || (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY);
+            if (!order.isStockAllocated() || !payable)
+                throw new IllegalStateException("Stock must be allocated and payment verified (or due on delivery) before fulfillment.");
+        }
+
+        // If completing a Cash on Delivery order, mark payment as SUCCESS
+        if ((newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED)
+                && order.getPaymentMethod() == PaymentMethod.COD
+                && order.getPaymentStatus() == PaymentStatus.DUE_ON_DELIVERY) {
+            order.setPaymentStatus(PaymentStatus.SUCCESS);
+        }
+
+        order.setStatus(newStatus);
+        Order updated = orderRepository.save(order);
+        auditLogRepository.save(com.icrowd_api.features.audit.AuditLog.builder()
+                .actorEmail(adminEmail).action("ORDER_STATUS_CHANGE").entityType("ORDER").entityId(orderId)
+                .details(oldStatus + " -> " + newStatus + (StringUtils.hasText(note) ? ": " + note.trim() : ""))
+                .build());
+
+        return convertToAdminSummaryDto(updated);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getOrderDashboardStats() {
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("totalOrders", orderRepository.count());
+        stats.put("pendingPaymentOrders", orderRepository.countByStatus(OrderStatus.PENDING_PAYMENT));
+        stats.put("confirmedOrders", orderRepository.countByStatus(OrderStatus.CONFIRMED));
+        stats.put("processingOrders", orderRepository.countByStatus(OrderStatus.PROCESSING));
+        stats.put("shippedOrders", orderRepository.countByStatus(OrderStatus.SHIPPED));
+        stats.put("deliveredOrders", orderRepository.countByStatus(OrderStatus.DELIVERED));
+        stats.put("completedOrders", orderRepository.countByStatus(OrderStatus.COMPLETED));
+        stats.put("cancelledOrders", orderRepository.countByStatus(OrderStatus.CANCELLED));
+        stats.put("totalRevenue", orderRepository.calculateTotalRevenue());
+
+        List<Order> recent = orderRepository.findTop5ByOrderByCreatedAtDesc();
+        List<AdminOrderSummaryDto> recentDtos = recent.stream()
+                .map(this::convertToAdminSummaryDto)
+                .toList();
+        stats.put("recentOrders", recentDtos);
+
+        return stats;
+
     }
 }

@@ -67,7 +67,7 @@ const ProductTable = ({ products, onEdit, onDelete, loading }) => {
                                 <td className="px-4 py-3.5">
                                     <div className="flex items-center gap-3">
                                         {product.imageUrls?.[0] ? (
-                                            <img src={product.imageUrls[0]} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0 bg-gray-100" />
+                                            <img src={product.imageUrls[0]} alt="" className="w-9 h-9 rounded-lg object-contain shrink-0 bg-white" />
                                         ) : (
                                             <div className="w-9 h-9 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center">
                                                 <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

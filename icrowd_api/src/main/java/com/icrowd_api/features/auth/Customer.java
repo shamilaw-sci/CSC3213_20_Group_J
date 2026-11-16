@@ -33,17 +33,19 @@ public class Customer {
     private User user;
 
     @NotBlank(message = "First name is required")
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String firstName;
 
     @NotBlank(message = "Last name is required")
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String lastName;
 
+    @Column(length = 20)
     private String phone;
 
     private LocalDate dateOfBirth;
 
+    @Column(length = 2048)
     private String profileImage;
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)

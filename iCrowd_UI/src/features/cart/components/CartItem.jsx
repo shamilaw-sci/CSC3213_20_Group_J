@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatLkr } from '../../../lib/currency';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 
 const CartItem = ({ item, updateQuantity, removeFromCart, isSoldOut = false }) => {
@@ -11,9 +12,9 @@ const CartItem = ({ item, updateQuantity, removeFromCart, isSoldOut = false }) =
       {/* Product Image */}
       <div className="w-24 h-24 sm:w-32 sm:h-32 bg-[#F6F6F6] rounded-2xl overflow-hidden flex-shrink-0 relative">
         <img 
-          src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''} 
+          src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : '/images/product-placeholder.svg'}
           alt={product.name}
-          className="w-full h-full object-cover mix-blend-multiply"
+          className="w-full h-full object-contain mix-blend-multiply"
         />
         {isSoldOut && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
@@ -44,17 +45,20 @@ const CartItem = ({ item, updateQuantity, removeFromCart, isSoldOut = false }) =
           <div className={`flex items-center rounded-full px-1 py-1 ${isSoldOut ? 'bg-gray-100 opacity-50 pointer-events-none' : 'bg-[#F6F6F6]'}`}>
             <button 
               onClick={() => updateQuantity(product.id, quantity - 1)}
+              aria-label={`Decrease quantity of ${product.name}`}
+              disabled={isSoldOut}
               className="w-8 h-8 rounded-full flex items-center justify-center text-black hover:bg-white hover:shadow-sm transition-all"
             >
               <Minus size={16} />
             </button>
             
-            <span className="w-10 text-center font-medium text-black">
+            <span aria-live="polite" aria-atomic="true" className="w-10 text-center font-medium text-black">
               {quantity}
             </span>
             
             <button 
               onClick={() => updateQuantity(product.id, quantity + 1)}
+              aria-label={`Increase quantity of ${product.name}`}
               disabled={isMaxStock || isSoldOut}
               className="w-8 h-8 rounded-full flex items-center justify-center text-black hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:shadow-none"
             >
@@ -65,11 +69,11 @@ const CartItem = ({ item, updateQuantity, removeFromCart, isSoldOut = false }) =
           {/* Price */}
           <div className="text-right">
             <span className={`text-lg font-bold ${isSoldOut ? 'text-gray-400 line-through' : 'text-black'}`}>
-              ${(product.price * quantity).toFixed(2)}
+              {formatLkr(product.price * quantity)}
             </span>
             {quantity > 1 && !isSoldOut && (
               <div className="text-xs text-gray-500 mt-1">
-                ${product.price.toFixed(2)} each
+                {formatLkr(product.price)} each
               </div>
             )}
           </div>

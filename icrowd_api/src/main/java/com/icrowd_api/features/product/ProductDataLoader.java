@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@org.springframework.context.annotation.Profile({"local", "demo"})
 @Configuration
 public class ProductDataLoader {
 
@@ -23,6 +24,7 @@ public class ProductDataLoader {
     }
 
     @Bean
+    @org.springframework.core.annotation.Order(2)
     CommandLineRunner loadProductData(ProductRepository productRepository, CategoryRepository categoryRepository) {
         return args -> {
             // 1. Ensure Categories exist
@@ -831,28 +833,17 @@ public class ProductDataLoader {
 
             // 2. Upsert each product so existing IDs are preserved
             for (Product p : products) {
-                Product existing = productRepository.findBySku(p.getSku()).orElse(null);
-                if (existing != null) {
-                    existing.setName(p.getName());
-                    existing.setDescription(p.getDescription());
-                    existing.setCategory(p.getCategory());
-                    existing.setPrice(p.getPrice());
-                    existing.setAvailableStock(p.getAvailableStock());
-                    existing.setImageUrls(p.getImageUrls());
-                    existing.setTags(p.getTags());
-                    existing.setBrand(p.getBrand());
-                    existing.setWarranty(p.getWarranty());
-                    existing.setDeliveryInfo(p.getDeliveryInfo());
-                    existing.setFeatures(p.getFeatures());
-                    existing.setSpecifications(p.getSpecifications());
-                    existing.setIsActive(true);
-                    productRepository.save(existing);
-                } else {
-                    productRepository.save(p);
+                if (p.getCostPrice() == null && p.getPrice() != null) {
+                    p.setCostPrice(p.getPrice().multiply(new BigDecimal("0.58")).setScale(2, java.math.RoundingMode.HALF_UP));
                 }
+                if (p.getLeadTimeDays() == null) {
+                    p.setLeadTimeDays(7);
+                }
+
+                if (!productRepository.existsBySku(p.getSku())) productRepository.save(p);
             }
 
-            System.out.println("All 25 Real Tech Products loaded and updated in the database.");
+            System.out.println("All 25 Real Tech Products seeded when absent; existing inventory preserved.");
         };
     }
 }

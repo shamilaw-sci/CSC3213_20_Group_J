@@ -67,4 +67,26 @@ public class PayHereClient {
             .body(Map.of("payment_id",paymentId,"description","Order cannot be fulfilled")).retrieve().body(Map.class);
         return result!=null && "1".equals(String.valueOf(result.get("status")));
     }
+
+    public record PaymentLookup(String transactionId, String state, java.math.BigDecimal amount, String currency) {}
+    public java.util.Optional<PaymentLookup> retrieve(String internalPaymentId) {
+        if (!refundsConfigured()) throw new IllegalStateException("Merchant API credentials are required for verification.");
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000); factory.setReadTimeout(15000);
+        RestClient client = RestClient.builder().baseUrl(baseUrl()).requestFactory(factory).build();
+        Map<?,?> token = client.post().uri("/merchant/v1/oauth/token")
+            .headers(h -> h.setBasicAuth(appId, appSecret)).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .body("grant_type=client_credentials").retrieve().body(Map.class);
+        if (token == null || token.get("access_token") == null) throw new IllegalStateException("Payment verification authentication failed.");
+        Map<?,?> response = client.get().uri(b -> b.path("/merchant/v1/payment/search").queryParam("order_id", internalPaymentId).build())
+            .headers(h -> h.setBearerAuth(token.get("access_token").toString())).retrieve().body(Map.class);
+        if (response == null || !"1".equals(String.valueOf(response.get("status")))) return java.util.Optional.empty();
+        if (!(response.get("data") instanceof List<?> rows) || rows.isEmpty()) return java.util.Optional.empty();
+        if (rows.size() != 1 || !(rows.getFirst() instanceof Map<?,?> row) || !internalPaymentId.equals(String.valueOf(row.get("order_id"))))
+            throw new IllegalStateException("Multiple or mismatched provider payments require merchant review.");
+        for (String key : List.of("payment_id", "status", "amount", "currency"))
+            if (row.get(key) == null) throw new IllegalStateException("Incomplete provider response.");
+        return java.util.Optional.of(new PaymentLookup(row.get("payment_id").toString(), row.get("status").toString(),
+                new java.math.BigDecimal(row.get("amount").toString()), row.get("currency").toString()));
+    }
 }

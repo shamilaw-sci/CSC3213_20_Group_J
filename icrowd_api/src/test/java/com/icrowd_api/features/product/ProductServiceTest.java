@@ -54,9 +54,9 @@ public class ProductServiceTest {
     void setUp() {
         Category electronics = Category.builder().id(1L).name("Electronics").build();
 
-        product1 = Product.builder().id(1L).name("Laptop").category(electronics).price(BigDecimal.valueOf(1000)).isActive(true).build();
-        product2 = Product.builder().id(2L).name("Headphones").category(electronics).price(BigDecimal.valueOf(100)).isActive(true).build();
-        product3 = Product.builder().id(3L).name("Mouse").category(electronics).price(BigDecimal.valueOf(50)).isActive(true).build();
+        product1 = Product.builder().id(1L).name("Laptop").category(electronics).price(BigDecimal.valueOf(1000)).isActive(true).availableStock(10).build();
+        product2 = Product.builder().id(2L).name("Headphones").category(electronics).price(BigDecimal.valueOf(100)).isActive(true).availableStock(10).build();
+        product3 = Product.builder().id(3L).name("Mouse").category(electronics).price(BigDecimal.valueOf(50)).isActive(true).availableStock(10).build();
     }
 
     @Test
@@ -164,6 +164,58 @@ public class ProductServiceTest {
         assertEquals(2, results.size());
         assertFalse(results.contains(product1)); // Excludes item already in cart
         assertTrue(results.contains(product2));
+    }
+
+    @Test
+    void recommendationsExcludeOwnedCartAndUnavailableProducts() {
+        User user = User.builder().id(10L).email("customer@example.com").build();
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(orderRepository.findUserPurchasedProductIds(10L)).thenReturn(List.of(1L));
+        when(cartRepository.findUserCartProductIds(10L)).thenReturn(List.of(2L));
+        product3.setAvailableStock(0);
+        when(productRepository.findByIsActiveTrue(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(product1, product2, product3)));
+        assertTrue(productService.getRecommendedProducts(user.getEmail(), 8).isEmpty());
+    }
+
+    @Test
+    void similarProductsPreferComparablePriceAndBrand() {
+        product1.setBrand("Example");
+        product3.setBrand("Example");
+        product3.setPrice(product1.getPrice());
+        when(productRepository.findByIdAndIsActiveTrue(1L)).thenReturn(Optional.of(product1));
+        when(productRepository.findSimilarProductsByCategory(eq(1L), eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(product2, product3)));
+        assertEquals(3L, productService.getSimilarProducts(1L, null, 2).get(0).getId());
+    }
+
+    @Test
+    void zeroLimitReturnsEmptyRecommendations() {
+        assertTrue(productService.getRecommendedProducts(null, 0).isEmpty());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void browseRejectsInvalidInputs() {
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, "unknown", 0, 10, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, -1, 10, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 101, null, null, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 10, BigDecimal.TEN, BigDecimal.ONE, null, false, null, false));
+        assertThrows(IllegalArgumentException.class, () -> productService.browse(null, null, null, 0, 10, null, null, null, false, 6.0, false));
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void browseUsesStableSortAndRecoversOutOfRangePages() {
+        when(productRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(), org.springframework.data.domain.PageRequest.of(8, 10), 12))
+            .thenReturn(new PageImpl<>(List.of(product1), org.springframework.data.domain.PageRequest.of(1, 10), 12));
+        var result = productService.browse(null, null, "price_asc", 8, 10, null, null, null, false, null, false);
+        var pages = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(productRepository, times(2)).findAll(any(org.springframework.data.jpa.domain.Specification.class), pages.capture());
+        assertEquals(1, pages.getAllValues().get(1).getPageNumber());
+        assertNotNull(pages.getValue().getSort().getOrderFor("id"));
+        assertTrue(pages.getValue().getSort().getOrderFor("price").isAscending());
+        assertEquals(List.of(product1), result.getContent());
     }
 }
 

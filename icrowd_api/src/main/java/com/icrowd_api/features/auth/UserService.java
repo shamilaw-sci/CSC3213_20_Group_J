@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+    public long countUsers() { return userRepository.count(); }
 
     @Autowired
     private UserRepository userRepository;
@@ -42,8 +43,9 @@ public class UserService {
 
     @Transactional
     public String registerUser(RegisterRequest request) {
+        request.setEmail(EmailAddress.canonical(request.getEmail()));
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-        if (existingUser.isPresent()) {
+        if (existingUser.isPresent() || userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             return "Email already exists!";
         }
 
@@ -101,8 +103,9 @@ public class UserService {
      */
     @Transactional
     public String registerAdmin(RegisterRequest request) {
+        request.setEmail(EmailAddress.canonical(request.getEmail()));
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-        if (existingUser.isPresent()) {
+        if (existingUser.isPresent() || userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             return "Email already exists!";
         }
 
@@ -161,6 +164,7 @@ public class UserService {
      * @throws SecurityException if the password does not match.
      */
     public void validateAdminPassword(String adminEmail, String rawPassword) {
+        if (rawPassword == null || rawPassword.isBlank()) throw new SecurityException("Confirm your administrator password.");
         User admin = userRepository.findByEmail(adminEmail)
                 .orElseThrow(() -> new RuntimeException("Admin user not found"));
         if (!passwordEncoder.matches(rawPassword, admin.getPassword())) {
@@ -225,6 +229,7 @@ public class UserService {
 
     @Transactional
     public String demoteToUser(Long id, String actorEmail) {
+        userRepository.lockAdministrators();
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return "User not found";
@@ -286,6 +291,7 @@ public class UserService {
 
     @Transactional
     public void deactivateUser(Long id, String actorEmail) {
+        userRepository.lockAdministrators();
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -298,6 +304,7 @@ public class UserService {
         }
 
         user.setAccountStatus("DEACTIVATED");
+        user.setTokenVersion(user.getTokenVersion() == null ? 1L : user.getTokenVersion() + 1);
         userRepository.save(user);
 
         auditService.log(actorEmail, "ACCOUNT_DEACTIVATION", "USER", user.getId(),
@@ -431,20 +438,16 @@ public class UserService {
 
     @Transactional
     public AddressDto addCustomerAddress(String email, AddressDto addressDto) {
-        Customer customer = customerRepository.findByUserEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
+        Customer customer = customerRepository.findByUserEmailWithLock(email)
+                .orElseGet(() -> customerRepository.findByUserEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
 
         List<Address> existingAddresses = addressRepository.findByCustomerId(customer.getId());
         boolean isFirst = existingAddresses.isEmpty();
         boolean shouldBeDefault = isFirst || Boolean.TRUE.equals(addressDto.getIsDefault());
 
         if (shouldBeDefault && !existingAddresses.isEmpty()) {
-            for (Address a : existingAddresses) {
-                if (Boolean.TRUE.equals(a.getIsDefault())) {
-                    a.setIsDefault(false);
-                    addressRepository.save(a);
-                }
-            }
+            addressRepository.clearDefaultAddressesForCustomer(customer.getId());
         }
 
         String recipient = addressDto.getRecipientName();
@@ -457,13 +460,15 @@ public class UserService {
             phone = customer.getPhone();
         }
 
-        String line1 = addressDto.getAddressLine1() != null ? addressDto.getAddressLine1() : addressDto.getAddress();
+        String line1 = addressDto.getAddressLine1() != null && !addressDto.getAddressLine1().trim().isEmpty()
+                ? addressDto.getAddressLine1().trim()
+                : (addressDto.getAddress() != null ? addressDto.getAddress().trim() : "");
 
         Address address = Address.builder()
                 .customer(customer)
                 .recipientName(recipient)
                 .phone(phone)
-                .addressLine1(line1 != null ? line1.trim() : "")
+                .addressLine1(line1)
                 .addressLine2(addressDto.getAddressLine2())
                 .city(addressDto.getCity() != null ? addressDto.getCity().trim() : "")
                 .district(addressDto.getDistrict())
@@ -482,36 +487,51 @@ public class UserService {
 
     @Transactional
     public AddressDto updateCustomerAddress(String email, Long addressId, AddressDto addressDto) {
-        Customer customer = customerRepository.findByUserEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
+        Customer customer = customerRepository.findByUserEmailWithLock(email)
+                .orElseGet(() -> customerRepository.findByUserEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
 
         Address address = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
 
-        if (Boolean.TRUE.equals(addressDto.getIsDefault()) && !Boolean.TRUE.equals(address.getIsDefault())) {
-            List<Address> existing = addressRepository.findByCustomerId(customer.getId());
-            for (Address a : existing) {
-                if (Boolean.TRUE.equals(a.getIsDefault())) {
-                    a.setIsDefault(false);
-                    addressRepository.save(a);
-                }
-            }
+        if (Boolean.TRUE.equals(addressDto.getIsDefault())) {
+            addressRepository.clearDefaultAddressesForCustomer(customer.getId());
             address.setIsDefault(true);
+        } else if (Boolean.FALSE.equals(addressDto.getIsDefault()) && Boolean.TRUE.equals(address.getIsDefault())) {
+            List<Address> others = addressRepository.findByCustomerId(customer.getId()).stream()
+                    .filter(a -> !a.getId().equals(addressId))
+                    .collect(Collectors.toList());
+            if (!others.isEmpty()) {
+                address.setIsDefault(false);
+                Address newDefault = others.get(0);
+                newDefault.setIsDefault(true);
+                addressRepository.save(newDefault);
+            } else {
+                address.setIsDefault(true);
+            }
         }
 
-        if (addressDto.getRecipientName() != null) address.setRecipientName(addressDto.getRecipientName());
-        if (addressDto.getPhone() != null) address.setPhone(addressDto.getPhone());
+        if (addressDto.getRecipientName() != null && !addressDto.getRecipientName().trim().isEmpty()) {
+            address.setRecipientName(addressDto.getRecipientName().trim());
+        }
+        if (addressDto.getPhone() != null && !addressDto.getPhone().trim().isEmpty()) {
+            address.setPhone(addressDto.getPhone().trim());
+        }
 
-        String line1 = addressDto.getAddressLine1() != null ? addressDto.getAddressLine1() : addressDto.getAddress();
-        if (line1 != null) address.setAddressLine1(line1.trim());
+        String line1 = addressDto.getAddressLine1() != null && !addressDto.getAddressLine1().trim().isEmpty()
+                ? addressDto.getAddressLine1().trim()
+                : (addressDto.getAddress() != null ? addressDto.getAddress().trim() : null);
+        if (line1 != null) {
+            address.setAddressLine1(line1);
+        }
 
-        if (addressDto.getAddressLine2() != null) address.setAddressLine2(addressDto.getAddressLine2());
-        if (addressDto.getCity() != null) address.setCity(addressDto.getCity().trim());
-        if (addressDto.getDistrict() != null) address.setDistrict(addressDto.getDistrict());
-        if (addressDto.getProvince() != null) address.setProvince(addressDto.getProvince());
-        if (addressDto.getPostalCode() != null) address.setPostalCode(addressDto.getPostalCode());
-        if (addressDto.getCountry() != null) address.setCountry(addressDto.getCountry());
-        if (addressDto.getLabel() != null) address.setAddressType(addressDto.getLabel());
+        if (addressDto.getAddressLine2() != null) address.setAddressLine2(addressDto.getAddressLine2().trim());
+        if (addressDto.getCity() != null && !addressDto.getCity().trim().isEmpty()) address.setCity(addressDto.getCity().trim());
+        if (addressDto.getDistrict() != null) address.setDistrict(addressDto.getDistrict().trim());
+        if (addressDto.getProvince() != null) address.setProvince(addressDto.getProvince().trim());
+        if (addressDto.getPostalCode() != null) address.setPostalCode(addressDto.getPostalCode().trim());
+        if (addressDto.getCountry() != null) address.setCountry(addressDto.getCountry().trim());
+        if (addressDto.getLabel() != null) address.setAddressType(addressDto.getLabel().trim());
         if (addressDto.getLatitude() != null) address.setLatitude(addressDto.getLatitude());
         if (addressDto.getLongitude() != null) address.setLongitude(addressDto.getLongitude());
 
@@ -521,8 +541,9 @@ public class UserService {
 
     @Transactional
     public void deleteCustomerAddress(String email, Long addressId) {
-        Customer customer = customerRepository.findByUserEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
+        Customer customer = customerRepository.findByUserEmailWithLock(email)
+                .orElseGet(() -> customerRepository.findByUserEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
 
         Address address = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
@@ -542,18 +563,17 @@ public class UserService {
 
     @Transactional
     public AddressDto setDefaultCustomerAddress(String email, Long addressId) {
-        Customer customer = customerRepository.findByUserEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email));
+        Customer customer = customerRepository.findByUserEmailWithLock(email)
+                .orElseGet(() -> customerRepository.findByUserEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Customer not found for email: " + email)));
 
         Address targetAddress = addressRepository.findByIdAndCustomerUserEmail(addressId, email)
                 .orElseThrow(() -> new RuntimeException("Address not found with id: " + addressId));
 
-        List<Address> allAddresses = addressRepository.findByCustomerId(customer.getId());
-        for (Address a : allAddresses) {
-            a.setIsDefault(a.getId().equals(addressId));
-            addressRepository.save(a);
-        }
+        addressRepository.clearDefaultAddressesForCustomer(customer.getId());
+        targetAddress.setIsDefault(true);
+        Address saved = addressRepository.save(targetAddress);
 
-        return AddressDto.fromEntity(targetAddress);
+        return AddressDto.fromEntity(saved);
     }
 }

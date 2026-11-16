@@ -7,6 +7,9 @@ import CategoryDistributionChart from '../component/CategoryDistributionChart';
 import RestockPredictionTable from '../component/RestockPredictionTable';
 import OpportunityInsightsCard from '../component/OpportunityInsightsCard';
 import InventoryHealthCard from '../component/InventoryHealthCard';
+import CustomerAnalyticsCard from '../component/CustomerAnalyticsCard';
+import ProductPerformanceTable from '../component/ProductPerformanceTable';
+import CategoryFinancialTable from '../component/CategoryFinancialTable';
 import DateRangeFilter from '../component/DateRangeFilter';
 import ExportMenu from '../component/ExportMenu';
 
@@ -19,6 +22,10 @@ const AnalyticsPage = () => {
     setRange,
     customStartDate,
     customEndDate,
+    demoMode,
+    setDemoMode,
+    grain,
+    setGrain,
     applyCustomRange,
     refresh,
   } = useAnalyticsDashboard();
@@ -89,17 +96,35 @@ const AnalyticsPage = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               AI Analytics & Business Intelligence
             </h1>
-            <span className="text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              Live DB
+            <span
+              className={`text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${
+                data?.isDemoData
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {data?.isDemoData ? 'Demo Mode' : `Live DB (${data?.overview?.qualifyingOrderCount ?? 0} Orders)`}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time multi-dimensional financial metrics, inventory risk monitoring, and AI predictive forecasts.
+            {data?.dataSource || 'Real-time multi-dimensional financial metrics, inventory risk monitoring, and statistical predictive forecasts.'}
           </p>
         </div>
 
-        {/* Action Controls: Refresh & Export */}
+        {/* Action Controls: Refresh, Export & Demo Mode Toggle */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setDemoMode(!demoMode)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              demoMode
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-md shadow-amber-500/10'
+                : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700/80'
+            }`}
+            title="Toggle between Live Database Figures and Sample Demo Data"
+          >
+            <span>{demoMode ? '🧪 Demo Active' : '📊 Show Demo Data'}</span>
+          </button>
+
           <ExportMenu data={data} />
 
           <button
@@ -113,6 +138,24 @@ const AnalyticsPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Demo Mode Notice Banner */}
+      {data?.isDemoData && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs text-amber-300">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚠️</span>
+            <span>
+              <strong>Demo Mode Enabled:</strong> Displaying simulated sample sales and forecasts. To view actual database orders, click "Demo Active" to switch to Live DB.
+            </span>
+          </div>
+          <button
+            onClick={() => setDemoMode(false)}
+            className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-xl font-bold text-[11px] text-amber-200"
+          >
+            Switch to Live DB
+          </button>
+        </div>
+      )}
 
       {/* Date Range Filter Bar (Screen UI) */}
       <div className="print:hidden">
@@ -129,10 +172,14 @@ const AnalyticsPage = () => {
       {/* 1. Overview KPI Cards */}
       <OverviewCards overview={data?.overview} />
 
-      {/* 2. Primary Charts Row */}
+      {/* 2. Primary Charts Row: Sales vs AI Demand Forecast (with Grain Selector) & Category Share */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <SalesForecastChart data={data?.salesForecast || []} />
+          <SalesForecastChart
+            data={data?.salesForecast || []}
+            grain={grain}
+            onSelectGrain={setGrain}
+          />
         </div>
         <div className="lg:col-span-1">
           <CategoryDistributionChart data={data?.inventoryDistribution || []} />
@@ -144,16 +191,33 @@ const AnalyticsPage = () => {
         <ProfitAnalysisChart data={data?.profitAnalysis || []} />
       </div>
 
-      {/* 4. AI Strategic Opportunity & Restock Forecast */}
+      {/* 4. Category Financial Performance Matrix */}
+      <CategoryFinancialTable categories={data?.categoryPerformance || []} />
+
+      {/* 5. Customer Purchase Analytics (RFM / Retention / CLV) */}
+      <CustomerAnalyticsCard customerAnalytics={data?.customerAnalytics} />
+
+      {/* 6. Product Performance: Top Drivers vs Dead Stock / Slow Moving SKUs */}
+      <ProductPerformanceTable
+        topProducts={data?.topProducts || []}
+        worstProducts={data?.worstProducts || []}
+      />
+
+      {/* 7. AI Strategic Opportunity & Restock Forecast */}
       <div id="insights" className="space-y-6">
         <OpportunityInsightsCard
           insights={data?.opportunityInsights}
           aiRecommendation={data?.aiRecommendation}
         />
-        <RestockPredictionTable predictions={data?.restockPredictions || []} />
+        <RestockPredictionTable
+          predictions={data?.restockPredictions || []}
+          skuPredictions={data?.skuRestockPredictions || []}
+          totalBudget={data?.totalRestockBudget || 0}
+          metrics={data?.forecastMetrics}
+        />
       </div>
 
-      {/* 5. Inventory Stock Health & Top Products */}
+      {/* 8. Inventory Stock Health Alerts */}
       <div id="inventory">
         <InventoryHealthCard
           lowStockItems={data?.inventoryHealth?.lowStockItems || []}

@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AuthContext } from '../../auth/context/AuthContext';
+import { AuthContext } from '../../auth/context/authState';
 
 /**
  * Wraps admin routes.
@@ -8,7 +8,7 @@ import { AuthContext } from '../../auth/context/AuthContext';
  * - If user is missing or not ADMIN: redirect to /login.
  * - Otherwise: render children.
  */
-const AdminRoute = ({ children }) => {
+const AdminRoute = ({ children, roles = ['ADMIN', 'INVENTORY_MANAGER'] }) => {
     const { user, loading } = useContext(AuthContext);
 
     if (loading) {
@@ -22,7 +22,7 @@ const AdminRoute = ({ children }) => {
         );
     }
 
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || !roles.includes(user.role)) {
         return <Navigate to="/login" replace />;
     }
 

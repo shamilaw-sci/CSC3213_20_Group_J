@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../cart/hooks/CartContext';
+import { useCart } from '../../cart/hooks/cartState';
 import { switchOrderToCod } from '../api/checkoutApi';
 
 export default function SwitchToCodButton({ orderId, disabled = false }) {
@@ -19,7 +19,7 @@ export default function SwitchToCodButton({ orderId, disabled = false }) {
       const result = err.response?.data;
       if (result?.error === 'OUT_OF_STOCK') {
         removeFromCart(result.productId);
-        localStorage.removeItem('checkoutData');
+        sessionStorage.removeItem('checkoutData');
         navigate('/cart', { state: { checkoutMessage: `Sorry, ${result.productName || 'an item'} just sold out. We removed it from your cart.` } });
       } else {
         setError(result?.message || 'Could not change payment method. Please check your order status.');

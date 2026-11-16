@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import SearchBar from '../../features/products/components/SearchBar';
 import { useProductFilters } from '../../features/products/hooks/useProductFilters';
 import { useAuth } from '../../features/auth/hooks/useAuth';
-import { useCart } from '../../features/cart/hooks/CartContext';
+import { useCart } from '../../features/cart/hooks/cartState';
 import { ShoppingBag } from 'lucide-react';
 
 const Navbar = () => {
@@ -42,6 +42,7 @@ const Navbar = () => {
           </div>
 
           {/* User Actions */}
+          {['ADMIN', 'INVENTORY_MANAGER'].includes(user?.role) && <Link to="/admin" className="text-sm font-semibold text-slate-700">Manage store</Link>}
           <div className="flex items-center gap-4 ml-4">
             {isAuthenticated ? (
               <div className="flex items-center gap-3">

@@ -1,15 +1,16 @@
 import SwitchToCodButton from '../components/SwitchToCodButton';
-import { useCart } from '../../cart/hooks/CartContext';
-import React, { useState, useEffect } from 'react';
-import { useLocation, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useCart } from '../../cart/hooks/cartState';
+import React, { useState, useEffect, useEffectEvent } from 'react';
+import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, Mail, Package, CreditCard, Loader2, AlertTriangle, RefreshCw, ShieldCheck, MapPin } from 'lucide-react';
 import { getPaymentStatus, initiatePayment, submitPayHereCheckout } from '../api/checkoutApi';
 
 const CheckoutSuccessPage = () => {
   const { removeFromCart, completeCheckout } = useCart();
+  const finishCart = useEffectEvent((id,items) => completeCheckout(id,items));
+  const removeUnavailable = useEffectEvent(id => removeFromCart(id));
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const queryOrderId = searchParams.get('orderId');
   const stateOrderId = location.state?.orderId;
@@ -33,15 +34,14 @@ const CheckoutSuccessPage = () => {
 
         setOrderData(data);
         if (data.orderStatus === 'STOCK_UNAVAILABLE') {
-          if (data.unavailableProductId) removeFromCart(data.unavailableProductId);
-          localStorage.removeItem('checkoutData');
-          const refund = data.paymentStatus === 'REFUNDED' ? ' Your payment has been refunded.' : ' Your refund is pending; please check this order again for its status.';
-          navigate('/cart', { replace: true, state: { orderStatusUrl: '/checkout/success?orderId=' + data.orderId, checkoutMessage: 'Sorry, ' + (data.unavailableProductName || 'an item') + ' just sold out. We removed it from your cart.' + refund } });
+          if (data.unavailableProductId) removeUnavailable(data.unavailableProductId);
+          sessionStorage.removeItem('checkoutData');
+          setLoading(false);
           return;
         }
         if (data.paymentStatus === 'SUCCESS' || data.paymentStatus === 'DUE_ON_DELIVERY') {
-          completeCheckout(data.orderId, data.items || []);
-          localStorage.removeItem('checkoutData');
+          finishCart(data.orderId, data.items || []);
+          sessionStorage.removeItem('checkoutData');
         }
 
         // If status is still INITIATED or PENDING, poll a few times
@@ -102,11 +102,18 @@ const CheckoutSuccessPage = () => {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Verifying Payment...</h2>
         <p className="text-sm text-gray-500 max-w-sm mx-auto">
-          We are confirming your transaction with the bank gateway. Please do not close or refresh this tab.
+          We are checking your payment. This may take a moment.
         </p>
       </div>
     );
   }
+
+  if (['CHARGEBACK','REVIEW_REQUIRED','REFUND_PENDING','REFUNDED'].includes(orderData?.paymentStatus) &&
+      !(orderData?.orderStatus === 'STOCK_UNAVAILABLE' && ['REFUND_PENDING', 'REFUNDED'].includes(orderData?.paymentStatus))) return <div className="max-w-xl mx-auto py-16 px-4 text-center">
+    <h1 className="text-2xl font-bold">{{CHARGEBACK:'Payment disputed',REVIEW_REQUIRED:'Payment under review',REFUND_PENDING:'Refund in progress',REFUNDED:'Payment refunded'}[orderData.paymentStatus]}</h1>
+    <p className="my-4">Order {orderData.orderReference || targetOrderId}. {orderData.paymentStatus==='REVIEW_REQUIRED' ? 'Support is checking the payment. Please wait for confirmation before trying to pay again.' : 'Contact support if you need help with this payment.'}</p>
+    <button onClick={() => setPollCount(count => count+1)} className="border rounded-xl p-3">Check status</button><Link className="block mt-4 underline" to="/profile">View orders</Link>
+  </div>;
 
   const isConfirmed = orderData?.paymentStatus === 'SUCCESS' ||
                       orderData?.paymentStatus === 'DUE_ON_DELIVERY' ||
@@ -116,6 +123,17 @@ const CheckoutSuccessPage = () => {
   const isFailed = orderData?.paymentStatus === 'FAILED' ||
                    orderData?.paymentStatus === 'CANCELLED' ||
                    orderData?.orderStatus === 'FAILED';
+
+  if (orderData?.orderStatus === 'STOCK_UNAVAILABLE') {
+    return <div className="max-w-xl mx-auto py-16 px-4 text-center">
+      <h1 className="text-2xl font-bold">Item unavailable â€” refund status</h1>
+      <p className="my-4">Order #{orderData.orderReference || targetOrderId}: {orderData.unavailableProductName || 'An item'} sold out and was removed from your cart.</p>
+      <p role="status">{orderData.paymentStatus === 'REFUNDED' ? 'Your payment has been refunded.' : 'Your refund is pending. Check again for an update.'}</p>
+      {errorMsg && <p role="alert">{errorMsg}</p>}
+      <button onClick={() => { setErrorMsg(''); setLoading(true); setPollCount(count => count + 1); }} className="my-4 bg-black text-white px-6 py-3 rounded-xl">Check refund status</button>
+      <Link className="block underline" to="/cart">Return to cart</Link>
+    </div>;
+  }
 
   // Requirement 55 & 56: If payment failed after return
   if (isFailed) {
@@ -173,7 +191,7 @@ const CheckoutSuccessPage = () => {
       </div>
 
       <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 mb-3">
-        <ShieldCheck size={14} /> Verified Order
+        <ShieldCheck size={14} /> Order received
       </div>
 
       <h1 className="text-3xl sm:text-4xl font-black text-black mb-2 tracking-tight">Order Confirmed!</h1>
@@ -190,7 +208,7 @@ const CheckoutSuccessPage = () => {
           <div>
             <h3 className="font-bold text-black text-sm mb-0.5">Confirmation Details</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
-              A receipt and tracking information have been recorded for your account. You can track this order in your profile anytime.
+              You can view your order and check its progress in My Orders.
             </p>
           </div>
         </div>
@@ -201,11 +219,11 @@ const CheckoutSuccessPage = () => {
             <Package size={18} />
           </div>
           <div>
-            <h3 className="font-bold text-black text-sm mb-0.5">Fulfillment Status</h3>
+            <h3 className="font-bold text-black text-sm mb-0.5">What happens next</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
               {displayMethod === 'COD'
-                ? 'Your order is CONFIRMED. Payment will be collected in cash or card when delivered to your doorstep.'
-                : 'Your payment was VERIFIED successfully. Our warehouse team is now packing your items for dispatch.'}
+                ? 'Your order is confirmed. Please have cash ready when your delivery arrives.'
+                : 'Payment received. We will prepare your items for delivery.'}
             </p>
             {orderData?.estimatedDelivery && (
               <p className="text-xs font-semibold text-gray-800 mt-1">
@@ -224,7 +242,7 @@ const CheckoutSuccessPage = () => {
             <div>
               <h3 className="font-bold text-black text-sm mb-0.5">Delivery Destination</h3>
               <p className="text-xs text-gray-600">
-                {orderData.shippingFullName} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {orderData.shippingAddress}, {orderData.shippingDistrict}
+                {orderData.shippingFullName}, {orderData.shippingAddress}, {orderData.shippingDistrict}
               </p>
             </div>
           </div>
@@ -235,7 +253,7 @@ const CheckoutSuccessPage = () => {
           <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center flex-shrink-0 text-purple-600">
             <CreditCard size={18} />
           </div>
-          <div className="flex-grow flex items-center justify-between">
+          <div className="flex-grow min-w-0 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-black text-sm mb-0.5">
                 {displayMethod === 'COD' ? 'Amount Due on Delivery' : 'Total Amount Paid'}
@@ -244,14 +262,14 @@ const CheckoutSuccessPage = () => {
                 Method: {displayMethod === 'COD' ? 'Cash on Delivery' : displayMethod === 'BANK_TRANSFER' ? 'Online Bank Transfer' : 'Credit/Debit Card'}
               </p>
             </div>
-            <span className="font-black text-xl text-black">Rs. {displayTotal.toFixed(2)}</span>
+            <span className="font-black text-xl text-black">LKR {displayTotal.toFixed(2)}</span>
           </div>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Link
-          to="/profile"
+          to="/profile?tab=orders"
           className="bg-black text-white px-8 py-4 rounded-full font-bold text-sm hover:bg-gray-800 transition-all shadow-md active:scale-95"
         >
           View My Orders

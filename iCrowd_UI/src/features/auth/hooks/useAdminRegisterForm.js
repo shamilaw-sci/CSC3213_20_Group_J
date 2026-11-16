@@ -10,6 +10,7 @@ export const useAdminRegisterForm = (onSuccess) => {
         lastName: '',
         email: '',
         password: '',
+        currentPassword: '',
         phone: '',
         address: '',
         district: '',
@@ -35,7 +36,7 @@ export const useAdminRegisterForm = (onSuccess) => {
         setFormError('');
         setSuccessMessage('');
 
-        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.currentPassword) {
             setFormError('Please fill in all required fields.');
             return;
         }

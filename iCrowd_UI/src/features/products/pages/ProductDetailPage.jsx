@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useProductDetail } from '../hooks/useProductDetail';
 import ProductSlider from '../components/ProductSlider';
-import { fetchSimilarProducts } from '../api/recommendationApi';
+import { fetchSimilarProducts, trackProductView } from '../api/recommendationApi';
+import FrequentlyBoughtTogether from '../components/FrequentlyBoughtTogether';
+import RecentlyViewedSection from '../components/RecentlyViewedSection';
 import { Star } from 'lucide-react';
 import ReviewSection from '../../review/components/ReviewSection';
 import QuestionSection from '../../review/components/QuestionSection';
@@ -13,8 +15,10 @@ import ProductSpecs from '../components/ProductSpecs';
 import AddToCartButton from '../../../components/ui/AddToCartButton';
 import BuyNowButton from '../../../components/ui/BuyNowButton';
 
-const ProductDetailPage = () => {
+const ProductDetailContent = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const promo = searchParams.get('promo')?.slice(0, 50);
   
   const { product, loading, error, refresh } = useProductDetail(id);
   const [similarProducts, setSimilarProducts] = useState([]);
@@ -23,7 +27,6 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
-    setSimilarLoading(true);
 
     fetchSimilarProducts(id, 8)
       .then((data) => {
@@ -35,6 +38,14 @@ const ProductDetailPage = () => {
       .finally(() => {
         if (isMounted) setSimilarLoading(false);
       });
+
+    // Telemetry: Track user product view
+    let sessionId = localStorage.getItem('icrowd_session_id');
+    if (!sessionId) {
+      sessionId = 'sess_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('icrowd_session_id', sessionId);
+    }
+    trackProductView(id, sessionId, 'VIEW');
 
     return () => { isMounted = false; };
   }, [id]);
@@ -59,6 +70,9 @@ const ProductDetailPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       
+      {promo && <div className="mb-6 border border-amber-200 bg-amber-50 p-4 rounded-xl">
+        Offer code: <strong>{promo}</strong>. Enter this code at checkout. Eligibility, minimum spend and expiry conditions apply; the discount is confirmed at checkout.
+      </div>}
       {/* 1. Product Description Component */}
       <div className="flex flex-col lg:flex-row gap-12 mb-12 bg-[#F6F6F6] p-6 md:p-12 rounded-[32px]">
         
@@ -113,7 +127,7 @@ const ProductDetailPage = () => {
           </p>
 
           <p className="text-4xl font-black text-black mb-8">
-            Rs. {product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            LKR {product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           
           <div className="flex items-center gap-4 mb-8">
@@ -125,7 +139,7 @@ const ProductDetailPage = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 w-full mb-4">
             <AddToCartButton product={product} className="shadow-sm" />
-            <BuyNowButton productId={product.id} />
+            <BuyNowButton product={product} />
           </div>
 
           <ProductFeatures 
@@ -140,6 +154,9 @@ const ProductDetailPage = () => {
       {/* 2. Technical Specifications */}
       <ProductSpecs specifications={product.specifications} />
 
+      {/* AI Frequently Bought Together Bundle */}
+      <FrequentlyBoughtTogether productId={id} />
+
       <ReviewSection key={'reviews-' + id} productId={id} onChanged={refresh} />
       <QuestionSection key={'questions-' + id} productId={id} />
 
@@ -151,8 +168,11 @@ const ProductDetailPage = () => {
         subtitle="Related products matched to this item and your taste."
       />
 
+      {/* 4. AI Browsing History: Recently Viewed Products */}
+      <RecentlyViewedSection currentProductId={id} />
+
     </div>
   );
 };
 
-export default ProductDetailPage;
+export default function ProductDetailPage() { const { id } = useParams(); return <ProductDetailContent key={id}/>; }

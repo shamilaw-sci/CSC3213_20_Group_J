@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import ProductSlider from '../components/ProductSlider';
+import StorefrontHero from '../components/StorefrontHero';
+import { defaultHero } from '../heroConfig';
+import { apiClient } from '../../../lib/axios';
+import { AuthContext } from '../../auth/context/authState';
 import { 
   fetchFeaturedProducts, 
   fetchLatestProducts, 
@@ -8,12 +12,25 @@ import {
 } from '../api/recommendationApi';
 
 const LandingPage = () => {
+  const { user, initializing } = useContext(AuthContext);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [latestProducts, setLatestProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [hero, setHero] = useState(defaultHero);
+  const [categories, setCategories] = useState([]);
+  const [categoryStatus, setCategoryStatus] = useState('loading');
+  useEffect(() => {
+    let active = true;
+    apiClient.get('/categories').then(({ data }) => {
+      if (active) { setCategories(data); setCategoryStatus('loaded'); }
+    }).catch(() => { if (active) setCategoryStatus('error'); });
+    apiClient.get('/storefront/hero').then(({ data }) => { if (active) setHero(data); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (initializing) return;
     let isMounted = true;
     const loadAllSections = async () => {
       setLoading(true);
@@ -38,26 +55,11 @@ const LandingPage = () => {
 
     loadAllSections();
     return () => { isMounted = false; };
-  }, []);
+  }, [initializing, user?.id]);
 
   return (
     <div className="w-full">
-      {/* Hero Banner Component */}
-      <div className="bg-[#0a0a0a] border-b border-gray-900 pt-32 pb-24 text-center px-4 overflow-hidden relative">
-        <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
-          <div className="w-3/4 h-3/4 bg-white/5 rounded-full blur-[100px]"></div>
-        </div>
-        
-        <h1 className="text-5xl md:text-[80px] font-bold tracking-tight text-white mb-6 leading-none relative z-10">
-          Pro, Beyond.
-        </h1>
-        <p className="text-xl md:text-2xl font-medium tracking-tight text-gray-400 max-w-2xl mx-auto mb-10 relative z-10">
-          Flagship smartphones and premium gear curated for the modern digital lifestyle.
-        </p>
-        <Link to="/search" className="inline-block bg-white hover:scale-105 text-black font-semibold py-4 px-12 rounded-full transition-all text-lg shadow-xl relative z-10 active:scale-95">
-          Shop Now
-        </Link>
-      </div>
+      <StorefrontHero hero={hero}/>
 
       {/* Categories Bar */}
       <div className="max-w-7xl mx-auto px-4 py-12">
@@ -65,13 +67,16 @@ const LandingPage = () => {
           Browse by Category
         </h3>
         <div className="flex flex-wrap justify-center gap-4">
-          {['Smartphone', 'Headset', 'PowerBank', 'Case'].map(cat => (
+          {categoryStatus === 'loading' && <p role="status" className="text-sm text-slate-500">Loading categories…</p>}
+          {categoryStatus === 'error' && <p role="status" className="text-sm text-slate-600">Categories could not be loaded. <Link to="/search" className="underline">Browse all products</Link></p>}
+          {categoryStatus === 'loaded' && categories.length === 0 && <Link to="/search" className="underline">Browse all products</Link>}
+          {categories.map(cat => (
             <Link 
-              key={cat} 
-              to={`/search?category=${cat}`}
+              key={cat.id}
+              to={`/search?category=${encodeURIComponent(cat.name)}`}
               className="bg-white border border-gray-300 hover:border-black text-black px-8 py-4 rounded-2xl transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-black/10 font-medium"
             >
-              {cat}
+              {cat.name}
             </Link>
           ))}
         </div>

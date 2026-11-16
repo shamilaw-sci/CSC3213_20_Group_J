@@ -3,9 +3,9 @@ import { apiClient } from '../../../lib/axios';
 /**
  * Fetches products from the Spring Boot backend with optional filters and pagination.
  */
-export const fetchProducts = async (keyword = '', category = '', sort = '', page = 0, size = 10) => {
+export const fetchProducts = async (keyword = '', category = '', sort = '', page = 0, size = 10, extra = {}, signal) => {
   try {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(Object.entries(extra).filter(([,v]) => v));
     if (keyword) params.append('keyword', keyword);
     if (category) params.append('category', category);
     if (sort) params.append('sort', sort);
@@ -15,7 +15,7 @@ export const fetchProducts = async (keyword = '', category = '', sort = '', page
     const queryString = params.toString();
     const url = `/products?${queryString}`;
     
-    const response = await apiClient.get(url);
+    const response = await apiClient.get(url, { signal });
     // Spring Boot Page<Product> object contains:
     // .content (the array of items), .totalElements, .totalPages, .number (current page)
     return response.data; 
