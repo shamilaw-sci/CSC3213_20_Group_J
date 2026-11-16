@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$EnableMarketing)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -16,7 +16,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $uiDirectory 'node_modules\vite\bin\
     throw 'Install frontend dependencies first: in iCrowd_UI, run npm.cmd ci.'
 }
 if (-not (Test-Path -LiteralPath (Join-Path $apiDirectory '.env'))) {
-    throw 'Configure icrowd_api/.env before starting. See docs/run-with-neon.md.'
+    throw 'Configure icrowd_api/.env before starting. See README.md in the project root.'
 }
 $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 8080, 5173 })
 if ($listeners.Count -gt 0) {
@@ -51,7 +51,8 @@ try {
     $backend = Start-Process -FilePath $javaPath -ArgumentList @(
         '-jar', "target\$jarName", '--spring.profiles.active=prod',
         '--server.address=127.0.0.1', '--server.port=8080',
-        '--spring.jpa.hibernate.ddl-auto=validate', '--app.marketing.enabled=false'
+        '--spring.jpa.hibernate.ddl-auto=validate', '--server.forward-headers-strategy=framework',
+        ('--app.marketing.enabled=' + $EnableMarketing.IsPresent.ToString().ToLowerInvariant())
     ) -WorkingDirectory $apiDirectory -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $logDirectory 'backend.log') `
         -RedirectStandardError (Join-Path $logDirectory 'backend-error.log')

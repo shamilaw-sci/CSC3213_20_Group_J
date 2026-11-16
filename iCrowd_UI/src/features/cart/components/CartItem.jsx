@@ -14,7 +14,7 @@ const CartItem = ({ item, updateQuantity, removeFromCart, isSoldOut = false }) =
         <img 
           src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : '/images/product-placeholder.svg'}
           alt={product.name}
-          className="w-full h-full object-cover mix-blend-multiply"
+          className="w-full h-full object-contain mix-blend-multiply"
         />
         {isSoldOut && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">

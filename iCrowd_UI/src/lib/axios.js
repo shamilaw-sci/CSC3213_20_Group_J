@@ -2,7 +2,8 @@ import axios from 'axios';
 import { sessionToken, clearSession } from './session';
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
-  timeout: 15000,
+  // Hosted database cold starts and transactional checkout can exceed 15 seconds.
+  timeout: 60000,
   headers: { 'Content-Type': 'application/json' },
 });
 apiClient.interceptors.request.use(config => {

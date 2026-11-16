@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class OrderStatusConverterTest {
 
@@ -43,6 +44,11 @@ class OrderStatusConverterTest {
     void testConvertToDatabaseColumn() {
         assertEquals("PENDING_PAYMENT", converter.convertToDatabaseColumn(OrderStatus.PENDING_PAYMENT));
         assertEquals("DELIVERED", converter.convertToDatabaseColumn(OrderStatus.DELIVERED));
-        assertEquals("PENDING", converter.convertToDatabaseColumn(null));
+    }
+
+    @Test
+    @DisplayName("An omitted status filter remains SQL NULL instead of PENDING")
+    void preservesNullForOptionalStatusFilters() {
+        assertNull(converter.convertToDatabaseColumn(null));
     }
 }

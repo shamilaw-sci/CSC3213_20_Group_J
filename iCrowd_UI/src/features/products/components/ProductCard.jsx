@@ -10,7 +10,7 @@ export default function ProductCard({ product }) {
   return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg">
     <Link to={`/product/${product.id}`} className="block focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600">
       <div className="aspect-[5/4] overflow-hidden bg-slate-50">
-        <img src={product.imageUrls?.[0] || '/images/product-placeholder.svg'} alt={product.name} loading="lazy" onError={event => { event.currentTarget.src = '/images/product-placeholder.svg'; }} className="h-full w-full object-cover transition-transform group-hover:scale-105"/>
+        <img src={product.imageUrls?.[0] || '/images/product-placeholder.svg'} alt={product.name} loading="lazy" onError={event => { event.currentTarget.src = '/images/product-placeholder.svg'; }} className="h-full w-full object-contain bg-white p-3 transition-transform group-hover:scale-105"/>
       </div>
       <div className="px-5 pt-5"><h3 className="min-h-12 text-base font-bold leading-6 text-slate-950 line-clamp-2">{product.name}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-slate-600 line-clamp-2">{product.description || product.category?.name || 'Explore product details'}</p></div>
     </Link>

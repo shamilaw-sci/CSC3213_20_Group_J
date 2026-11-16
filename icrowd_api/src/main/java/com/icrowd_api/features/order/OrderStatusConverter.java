@@ -12,7 +12,9 @@ public class OrderStatusConverter implements AttributeConverter<OrderStatus, Str
 
     @Override
     public String convertToDatabaseColumn(OrderStatus attribute) {
-        return attribute != null ? attribute.name() : OrderStatus.PENDING.name();
+        // Hibernate also applies this converter to optional status query parameters.
+        // Replacing null with PENDING turns an unfiltered search into a status filter.
+        return attribute != null ? attribute.name() : null;
     }
 
     @Override
