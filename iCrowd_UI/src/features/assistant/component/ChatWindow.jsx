@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ChatMessageItem from './ChatMessageItem';
 import ChatInput from './ChatInput';
+import { GEMINI_MODEL } from '../api/geminiApi';
 
 const ChatWindow = ({
   isOpen,
@@ -13,6 +14,7 @@ const ChatWindow = ({
   geminiApiKey = '',
   onSaveGeminiKey,
   isGeminiActive = false,
+  onToggleGemini,
   showSettings = false,
   setShowSettings,
 }) => {
@@ -117,7 +119,7 @@ const ChatWindow = ({
               <h4 className="font-bold text-xs text-indigo-950">Google Gemini AI Engine (External AI)</h4>
             </div>
             <span className="text-[10px] text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full font-medium">
-              Gemini 1.5 Flash
+              {GEMINI_MODEL}
             </span>
           </div>
 
@@ -129,6 +131,7 @@ const ChatWindow = ({
             <div className="flex items-center gap-1.5">
               <input
                 type="password"
+                aria-label="Gemini API key"
                 value={localKey}
                 onChange={(e) => setLocalKey(e.target.value)}
                 placeholder="AIzaSy... (Paste Gemini API Key)"
@@ -159,13 +162,18 @@ const ChatWindow = ({
                 rel="noreferrer"
                 className="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-1"
               >
-                🔑 Get Free API Key at Google AI Studio ↗
+                🔑 Get an API key at Google AI Studio ↗
               </a>
               <span className="text-gray-500 text-[10px]">
                 {geminiApiKey ? '✅ Key Saved' : '⚪ Using Smart Local Engine'}
               </span>
             </div>
           </form>
+          <label className="flex items-center gap-2 text-xs text-indigo-950">
+            <input type="checkbox" checked={isGeminiActive} disabled={!geminiApiKey}
+              onChange={event => onToggleGemini?.(event.target.checked)} />
+            Use Gemini for answers
+          </label>
         </div>
       )}
 

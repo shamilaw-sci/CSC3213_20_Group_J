@@ -105,14 +105,30 @@ public class MarketingWorker {
         String unsubscribe = base(config.getPublicApiUrl()) + "/api/marketing/unsubscribe?token=" + preference.getUnsubscribeToken();
         String plain = title + "\n" + p.getName() + "\n" + details + "\nView product: " + url + "\nUnsubscribe: " + unsubscribe;
         String image = "";
-        if (p.getImageUrls() != null && !p.getImageUrls().isEmpty() && p.getImageUrls().get(0).startsWith("https://"))
-            image = "<img width='240' alt='' src='" + esc(p.getImageUrls().get(0)) + "'>";
+        if (p.getImageUrls() != null && !p.getImageUrls().isEmpty()) {
+            String imageUrl = emailImageUrl(p.getImageUrls().get(0), config.getFrontendUrl());
+            if (imageUrl != null) image = "<img width='240' alt='" + esc(p.getName()) + "' src='" + esc(imageUrl) + "'>";
+        }
         String html = "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px'><h1>" + esc(title) + "</h1>" + image
             + "<h2>" + esc(p.getName()) + "</h2><p>" + esc(details) + "</p><p><a style='display:inline-block;background:#111;color:#fff;padding:14px 22px;border-radius:8px' href='" + esc(url)
             + "'>View product and offer</a></p><p>You received this because you subscribed to relevant product updates.</p><a href='" + esc(unsubscribe) + "'>Unsubscribe</a></body></html>";
         return new Outgoing(d.getId(),user.getEmail(),title.replaceAll("[\r\n]"," "),plain,html,unsubscribe);
     }
     private String base(String url) { return url.replaceAll("/+$", ""); }
+    static String emailImageUrl(String value, String frontendUrl) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            URI image = URI.create(value);
+            if (!image.isAbsolute()) {
+                if (!value.startsWith("/") || value.startsWith("//")) return null;
+                image = URI.create(frontendUrl).resolve(image);
+            }
+            return "https".equalsIgnoreCase(image.getScheme()) && image.getHost() != null && image.getUserInfo() == null
+                ? image.toString() : null;
+        } catch (IllegalArgumentException malformedUrl) {
+            return null;
+        }
+    }
     private String esc(String value) { return HtmlUtils.htmlEscape(value); }
     private void deliver(Outgoing outgoing) {
         String result = "SENT", failure = null;

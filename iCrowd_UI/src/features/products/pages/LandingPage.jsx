@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import ProductSlider from '../components/ProductSlider';
 import StorefrontHero from '../components/StorefrontHero';
 import { defaultHero } from '../heroConfig';
 import { apiClient } from '../../../lib/axios';
+import { AuthContext } from '../../auth/context/authState';
 import { 
   fetchFeaturedProducts, 
   fetchLatestProducts, 
@@ -11,6 +12,7 @@ import {
 } from '../api/recommendationApi';
 
 const LandingPage = () => {
+  const { user, initializing } = useContext(AuthContext);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [latestProducts, setLatestProducts] = useState([]);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
@@ -28,6 +30,7 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (initializing) return;
     let isMounted = true;
     const loadAllSections = async () => {
       setLoading(true);
@@ -52,7 +55,7 @@ const LandingPage = () => {
 
     loadAllSections();
     return () => { isMounted = false; };
-  }, []);
+  }, [initializing, user?.id]);
 
   return (
     <div className="w-full">

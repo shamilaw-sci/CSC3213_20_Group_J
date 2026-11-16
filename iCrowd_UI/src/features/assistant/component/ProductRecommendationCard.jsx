@@ -24,7 +24,7 @@ const ProductRecommendationCard = ({ product }) => {
         <img
           src={imageUrl}
           alt={product.name}
-          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
+          className="object-contain w-full h-full group-hover:scale-110 transition-transform duration-300"
           onError={(e) => {
             e.target.src = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80';
           }}
